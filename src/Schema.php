@@ -5,6 +5,7 @@ namespace Light\DB;
 use Illuminate\Support\LazyCollection;
 use Laminas\Db\Adapter\Adapter;
 use Laminas\Db\Sql\Ddl;
+use Laminas\Db\TableGateway\TableGateway;
 
 class Schema
 {
@@ -21,6 +22,11 @@ class Schema
                 yield new Table($this->adapter, $name);
             }
         });
+    }
+
+    public function getTableGateway(string $name, $features = null)
+    {
+        return new TableGateway($name, $this->adapter, $features);
     }
 
     public function table(string $name)
