@@ -35,6 +35,16 @@ $adapter = new Adapter([
 
 $schema = new \Light\DB\Schema($adapter);
 
+
+
+$c = $schema->table("Testing5")->columns->first();
+print_R($c);
+die();
+
+print_r($c->rename("value" . rand(1, 1000)));
+die();
+
+
 $table = $schema->getTableGateway("User", new RowGatewayFeature("user_id"));
 $rowset = $table->select(function (Select $select) {
     $select->limit(3);
@@ -45,7 +55,7 @@ foreach ($rowset as $row) {
 }
 die();
 
-$schema->table("User")->rows->all();
+$schema->table("")->rows->all();
 
 
 $schema->removeTable('Testing5');

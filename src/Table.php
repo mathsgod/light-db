@@ -15,13 +15,14 @@ class Table
 {
 
     public $name;
-    private $adapter;
+    public $adapter;
     public $columns;
     public $rows;
     public $constraints;
 
-    public function __construct(Adapter $adapter, string $name)
+    public function __construct(Adapter $adapter,  string $name)
     {
+
         $this->name = $name;
         $this->adapter = $adapter;
 
@@ -30,7 +31,7 @@ class Table
             $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
 
             foreach ($meta->getColumns($this->name) as $column) {
-                yield new Column($this->adapter, $column);
+                yield new Column($column);
             }
         });
 
@@ -77,6 +78,11 @@ class Table
         $table->insert($data);
 
         return $table->getLastInsertValue();
+    }
+
+    public function column(string $name)
+    {
+        return $this->columns->first(fn($column) => $column->name === $name);
     }
 
     public function removeColumn(string $name)
@@ -150,6 +156,9 @@ class Table
          */
         $results = $table->select($where);
 
+        /**
+         * @var RowGateway
+         */
         return $results->current();
     }
 }

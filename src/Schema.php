@@ -15,12 +15,11 @@ class Schema
     {
         $this->adapter = $adapter;
         $this->tables = new LazyCollection(function () {
-
             $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
 
             foreach ($meta->getTableNames() as $name) {
                 yield new Table($this->adapter, $name);
-            }
+            } 
         });
     }
 

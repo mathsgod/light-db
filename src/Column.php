@@ -2,7 +2,9 @@
 
 namespace Light\DB;
 
+use Laminas\Db\Adapter\Adapter;
 use Laminas\Db\Metadata\Object\ColumnObject;
+use Laminas\Db\Sql\Ddl;
 
 class Column
 {
@@ -11,12 +13,11 @@ class Column
     public $null;
     public $key;
     public $default;
-    public $extra;
+    public $data;
 
-    public function __construct($adapter, ColumnObject $column)
+    public function __construct(ColumnObject $column)
     {
-
-
+        $this->data = $column;
         $this->name = $column->getName();
         $this->type = $column->getDataType();
         $this->null = $column->isNullable();
