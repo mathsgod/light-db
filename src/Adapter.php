@@ -28,6 +28,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
         $username = $_ENV["DATABASE_USERNAME"];
         $password = $_ENV["DATABASE_PASSWORD"];
         $charset = $_ENV["DATABASE_CHARSET"] ?? "utf8mb4";
+        $driver = $_ENV["DATABASE_DRIVER"] ?? "pdo_mysql";
 
         if (!$host) throw new \Exception("DATABASE_HOSTNAME not found in .env");
         if (!$name) throw new \Exception("DATABASE_DATABASE not found in .env");
@@ -55,7 +56,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
             "password" => $password,
             "port" => $port,
             "charset" => $charset,
-            "driver" => "Pdo_Mysql",
+            "driver" => $driver,
             "driver_options" => $driver_options
         ]);
     }
