@@ -87,9 +87,12 @@ class Table extends TableGateway
         $this->execute($sql->buildSqlString($table));
     }
 
-    public function count(): int
+    public function count($where = null): int
     {
         $select = new Select($this->table);
+        if (isset($where)) {
+            $select->where($where);
+        }
         $select->columns([
             "c" => new Expression("count(*)")
         ]);

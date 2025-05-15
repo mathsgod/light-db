@@ -132,4 +132,50 @@ final class TableTest extends TestCase
 
         $this->assertEquals(intval($table->avg('name')), 2);
     }
+
+
+    public function testWhereCondition()
+    {
+        $table = $this->getTable();
+        $table->truncate();
+
+        $table->insert(["name" => 'a']);
+        $table->insert(["name" => 'b']);
+        $result = $table->select("name='b'");
+
+        $result = iterator_to_array($result);
+        $this->assertCount(1, $result);
+        $this->assertEquals($result[0]['name'], 'b');
+    }
+
+    public function testCountWithCondition()
+    {
+        $table = $this->getTable();
+        $table->truncate();
+
+        $table->insert(["name" => 'x']);
+        $table->insert(["name" => 'y']);
+        $count = $table->count("name='x'");
+        $this->assertEquals($count, 1);
+    }
+
+    public function testInsertMultipleRows()
+    {
+        $table = $this->getTable();
+        $table->truncate();
+
+        $table->insert(["name" => 'a']);
+        $table->insert(["name" => 'b']);
+        $table->insert(["name" => 'c']);
+        $this->assertEquals($table->count(), 3);
+    }
+
+    public function testDeleteNonExistentRow()
+    {
+        $table = $this->getTable();
+        $table->truncate();
+
+        $affected = $table->delete(["name" => "not_exist"]);
+        $this->assertEquals($affected, 0);
+    }
 }
