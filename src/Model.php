@@ -35,7 +35,9 @@ abstract class Model extends RowGateway
 
         $obj = $ref_class->newInstance($primaryKeys, static::class, $table->adapter);
 
-        //$data[$primaryKey] = null;
+        foreach ($table->columns() as $column) {
+            $obj->original[$column->getName()] = $column->getColumnDefault();
+        }
 
         foreach ($data as $key => $value) {
             if ($table->column($key)->getDataType() == "json") {

@@ -48,6 +48,9 @@ class Table extends TableGateway
         return $this->getLastInsertValue();
     }
 
+    /**
+     * @return \Illuminate\Support\LazyCollection<int, \Laminas\Db\Metadata\Object\ColumnObject>
+     */
     public function columns()
     {
         if ($this->_columns) return $this->_columns;
