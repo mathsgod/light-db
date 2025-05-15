@@ -152,10 +152,10 @@ class Table extends TableGateway
     {
         $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
         $tableNames = $meta->getTableNames();
-        if (in_array($this->table, $tableNames)) {
-            return $this->execute("TRUNCATE TABLE `{$this->table}`");
+        if (!in_array($this->table, $tableNames)) {
+            throw new \Exception("Table {$this->table} not found");
         }
-        return null;
+        return $this->execute("TRUNCATE TABLE `{$this->table}`");
     }
 
     function getColumn(string $name)
