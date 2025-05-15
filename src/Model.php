@@ -25,32 +25,20 @@ abstract class Model extends RowGateway
         //reflector class
         $ref_class = new ReflectionClass(static::class);
 
-        $adapter = self::GetAdapter();
+        $table = self::_table();
 
-        $primaryKey = "";
-        $meta = Factory::createSourceFromAdapter($adapter);
-
-
-        foreach ($meta->getConstraints(static::class) as $constraint) {
-            if ($constraint->getType() == "PRIMARY KEY") {
-                $primaryKey = $constraint->getColumns()[0];
-                break;
-            }
-        }
-
-        if (empty($primaryKey)) {
+        $primaryKeys = $table->getPrimaryKey();
+        if (count($primaryKeys) == 0) {
             throw new \Exception("No primary key found for " . static::class);
         }
 
 
-        $obj = $ref_class->newInstance($primaryKey, static::class, $adapter);
+        $obj = $ref_class->newInstance($primaryKeys, static::class, $table->adapter);
 
         //$data[$primaryKey] = null;
 
-
-        $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
         foreach ($data as $key => $value) {
-            if ($metadata->getColumn($key, static::class)->getDataType() == "json") {
+            if ($table->column($key)->getDataType() == "json") {
                 if (is_array($value)) {
                     $data[$key] = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
                 }
@@ -165,14 +153,14 @@ abstract class Model extends RowGateway
 
         if ($column->getDataType() == "json") {
 
-            $d=json_decode($data[$name], true);
+            $d = json_decode($data[$name], true);
 
             if (is_array($d)) {
                 $v = new Proxy($this, $name, $data[$name]);
                 return $v;
             }
             return $d;
-            
+
 
             $v = new Proxy($this, $name, parent::__get($name));
             return $v;
