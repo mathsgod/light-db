@@ -9,7 +9,7 @@ use Laminas\Db\Adapter\AdapterInterface;
 use Laminas\Db\Sql\Expression;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
 use Laminas\Paginator\Paginator;
-use R\DB\Paginator\Adapter;
+use Light\Db\Paginator\Adapter;
 use Traversable;
 use ReflectionClass;
 

@@ -26,4 +26,18 @@ class Proxy extends ArrayObject
         $this->data[$key] = $value;
         $this->obj->__set($this->property, $this->data);
     }
+
+    public function offsetUnset(mixed $key): void
+    {
+        parent::offsetUnset($key);
+
+        unset($this->data[$key]);
+        $this->obj->__set($this->property, $this->data);
+    }
+
+    public function offsetGet(mixed $key): mixed
+    {
+        // 若 key 不存在，回傳 null
+        return parent::offsetExists($key) ? parent::offsetGet($key) : null;
+    }
 }

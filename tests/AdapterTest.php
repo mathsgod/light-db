@@ -48,6 +48,30 @@ final class AdapterTest extends TestCase
         $this->assertFalse($db->hasTable("NEW_TABLE"));
     }
 
+    public function testAddAndRemoveTable()
+    {
+        $db = Testing::GetAdapter();
+        $tableName = "TMP_TABLE";
+
+        // 移除殘留
+        if ($db->hasTable($tableName)) {
+            $db->dropTable($tableName);
+        }
+        $table = new CreateTable($tableName);
+        $table->addColumn(new Column("id", "int"));
+        // 新增資料表
+        $db->addTable($table);
+        $this->assertTrue($db->hasTable($tableName));
+
+        // 取得所有資料表
+        $tables = $db->getTables()->toArray();
+        $this->assertContainsOnlyInstancesOf(Table::class, $tables);
+
+        // 移除資料表
+        $db->removeTable($tableName);
+        $this->assertFalse($db->hasTable($tableName));
+    }
+
     /*  public function testPrepare()
     {
         $s = Testing::GetSchema();

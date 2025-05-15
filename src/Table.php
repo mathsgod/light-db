@@ -65,15 +65,15 @@ class Table extends TableGateway
         return $this->columns()->first(fn($column) => $column->getName() === $name);
     }
 
-    public function removeColumn(string $table)
+    public function removeColumn(string $name)
     {
         $this->_columns = null;
         $this->_constraints = null;
-        $table = new Ddl\AlterTable();
-        $table->dropColumn($table);
+        $alter = new Ddl\AlterTable($this->table);
+        $alter->dropColumn($name);
 
         $sql = new \Laminas\Db\Sql\Sql($this->adapter);
-        return $this->execute($sql->buildSqlString($table));
+        return $this->execute($sql->buildSqlString($alter));
     }
 
     public function addColumn(ColumnInterface $column)
@@ -84,7 +84,7 @@ class Table extends TableGateway
         $table->addColumn($column);
 
         $sql = new \Laminas\Db\Sql\Sql($this->adapter);
-        $this->execute($sql->buildSqlString($table));
+        return $this->execute($sql->buildSqlString($table));
     }
 
     public function count($where = null): int
