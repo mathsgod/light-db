@@ -9,13 +9,16 @@ class Proxy extends ArrayObject
 
     public $obj;
     public $property;
-    public $data;
+    public $data = [];
     public function __construct($obj, $property, $data)
     {
         $this->obj = $obj;
         $this->property = $property;
-        $this->data = json_decode($data, true);
-        parent::__construct(json_decode($data, true), ArrayObject::ARRAY_AS_PROPS);
+        if ($data) {
+            $this->data = json_decode($data, true);
+        }
+
+        parent::__construct($this->data, ArrayObject::ARRAY_AS_PROPS);
     }
 
 

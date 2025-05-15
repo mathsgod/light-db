@@ -22,27 +22,42 @@ abstract class Model extends RowGateway
     static function Create(?array $data = [])
     {
 
-        $table = self::_table();
-        $primaryKeys = $table->getPrimaryKey();
-
-        if (!count($primaryKeys)) {
-            throw new \Exception("No primary key found for " . static::class);
-        }
-
         //reflector class
         $ref_class = new ReflectionClass(static::class);
 
+        $adapter = self::GetAdapter();
 
-        $obj = $ref_class->newInstance($primaryKeys[0], static::class, $table->adapter);
+        $primaryKey = "";
+        $meta = Factory::createSourceFromAdapter($adapter);
 
+
+        foreach ($meta->getConstraints(static::class) as $constraint) {
+            if ($constraint->getType() == "PRIMARY KEY") {
+                $primaryKey = $constraint->getColumns()[0];
+                break;
+            }
+        }
+
+        if (empty($primaryKey)) {
+            throw new \Exception("No primary key found for " . static::class);
+        }
+
+
+        $obj = $ref_class->newInstance($primaryKey, static::class, $adapter);
+
+        //$data[$primaryKey] = null;
+
+
+        $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
         foreach ($data as $key => $value) {
-            if ($table->getColumn($key)->getDataType() == "json") {
+            if ($metadata->getColumn($key, static::class)->getDataType() == "json") {
                 if (is_array($value)) {
                     $data[$key] = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
                 }
             }
         }
         $obj->populate($data, false);
+
 
         return $obj;
     }
@@ -150,20 +165,14 @@ abstract class Model extends RowGateway
 
         if ($column->getDataType() == "json") {
 
-            if (array_key_exists($name, $this->data)) {
-                $v = new Proxy($this, $name, $this->data[$name]);
+            $d=json_decode($data[$name], true);
+
+            if (is_array($d)) {
+                $v = new Proxy($this, $name, $data[$name]);
                 return $v;
             }
-
-            if (array_key_exists($name, $this->original)) {
-                if ($this->original[$name] == null) {
-                    $v = null;
-                    return $v;
-                }
-
-                $v = new Proxy($this, $name, $this->original[$name]);
-                return $v;
-            }
+            return $d;
+            
 
             $v = new Proxy($this, $name, parent::__get($name));
             return $v;
