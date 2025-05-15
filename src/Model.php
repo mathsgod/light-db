@@ -22,42 +22,27 @@ abstract class Model extends RowGateway
     static function Create(?array $data = [])
     {
 
-        //reflector class
-        $ref_class = new ReflectionClass(static::class);
+        $table = self::_table();
+        $primaryKeys = $table->getPrimaryKey();
 
-        $adapter = self::GetAdapter();
-
-        $primaryKey = "";
-        $meta = Factory::createSourceFromAdapter($adapter);
-
-
-        foreach ($meta->getConstraints(static::class) as $constraint) {
-            if ($constraint->getType() == "PRIMARY KEY") {
-                $primaryKey = $constraint->getColumns()[0];
-                break;
-            }
-        }
-
-        if (empty($primaryKey)) {
+        if (!count($primaryKeys)) {
             throw new \Exception("No primary key found for " . static::class);
         }
 
-
-        $obj = $ref_class->newInstance($primaryKey, static::class, $adapter);
-
-        //$data[$primaryKey] = null;
+        //reflector class
+        $ref_class = new ReflectionClass(static::class);
 
 
-        $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
+        $obj = $ref_class->newInstance($primaryKeys[0], static::class, $table->adapter);
+
         foreach ($data as $key => $value) {
-            if ($metadata->getColumn($key, static::class)->getDataType() == "json") {
+            if ($table->getColumn($key)->getDataType() == "json") {
                 if (is_array($value)) {
                     $data[$key] = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
                 }
             }
         }
         $obj->populate($data, false);
-
 
         return $obj;
     }

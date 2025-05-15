@@ -25,11 +25,9 @@ require_once __DIR__ . '/vendor/autoload.php';
     public function profilerFinish() {}
 }
  */
-$s = Schema::Create();
-
 class User extends Model {}
-
 $u = User::Get(1);
+print_R($u->style["card"]);die;
 $u->style["card"]="a";
 
 print_R($u);
