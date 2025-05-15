@@ -6,10 +6,12 @@ use Laminas\Db\RowGateway\Feature\FeatureSet;
 use Laminas\Db\Sql\Ddl\CreateTable;
 use Laminas\Db\Sql\Select;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
+use Light\Db\Model;
+use Light\Db\Schema;
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-class Profiler implements ProfilerInterface
+/* class Profiler implements ProfilerInterface
 {
     public function profilerStart($target)
     {
@@ -22,18 +24,23 @@ class Profiler implements ProfilerInterface
 
     public function profilerFinish() {}
 }
+ */
+$s = Schema::Create();
+
+class User extends Model {}
+
+$u = User::Get(1);
+$u->style["card"]="a";
+
+print_R($u);
 
 
-$adapter = new Adapter([
-    "driver" => "Pdo_Mysql",
-    "database" => "raymond",
-    "username" => "root",
-    "password" => "111111",
-    "hostname" => "127.0.0.1",
-    "charset" => "UTF8"
-]);
+die();
 
-$schema = new \Light\DB\Schema($adapter);
+print_r(User::Query()->toArray());
+
+
+die();
 
 
 
