@@ -150,7 +150,12 @@ class Table extends TableGateway
 
     public function truncate()
     {
-        return $this->execute("TRUNCATE TABLE `{$this->table}`");
+        $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
+        $tableNames = $meta->getTableNames();
+        if (in_array($this->table, $tableNames)) {
+            return $this->execute("TRUNCATE TABLE `{$this->table}`");
+        }
+        return null;
     }
 
     function getColumn(string $name)
