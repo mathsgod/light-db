@@ -382,7 +382,7 @@ abstract class Model extends RowGateway
 
     static function __attributes()
     {
-        return self::_table()->_columns->all();
+        return self::_table()->columns()->all();
     }
 
     function __call($class_name, $args)

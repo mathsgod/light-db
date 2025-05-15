@@ -17,44 +17,15 @@ use Laminas\Db\Sql\Sql;
 use Laminas\Db\TableGateway\Feature\MetadataFeature;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
 use Laminas\Db\Sql\Predicate;
+
 class Table extends TableGateway
 {
-    public $_columns;
-    public $_rows;
-    public $_constraints;
+    protected $_columns = null;
+    protected $_constraints = null;
 
-    public function __construct($table, AdapterInterface $adapter,  $feature = null)
+    public function getConstraints()
     {
-
-
-        $this->_columns = new LazyCollection(function () {
-            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
-            foreach ($meta->getColumns($this->table) as $column) {
-                yield $column;
-            }
-        });
-
-
-        $this->_rows = new LazyCollection(function () {
-
-            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
-
-            //  new Table
-            $table = new TableGateway($this->table, $this->adapter, [
-                new MetadataFeature($meta),
-                new RowGatewayFeature()
-            ]);
-
-
-            foreach ($table->select() as $row) {
-
-                /**
-                 * @var RowGateway $row
-                 */
-                yield $row;
-            }
-        });
-
+        if ($this->_constraints) return $this->_constraints;
         $this->_constraints = new LazyCollection(function () {
 
             $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
@@ -63,43 +34,52 @@ class Table extends TableGateway
                 yield $constraint;
             }
         });
-
-        parent::__construct($table, $adapter, $feature);
+        return $this->_constraints;
     }
 
     public function removeRow(array $where)
     {
-        $table = new TableGateway($this->table, $this->adapter);
-        return $table->delete($where);
+        $this->delete($where);
     }
 
     public function addRow(array $data)
     {
-        $table = new TableGateway($this->table, $this->adapter);
-        $table->insert($data);
+        $this->insert($data);
+        return $this->getLastInsertValue();
+    }
 
-        return $table->getLastInsertValue();
+    public function columns()
+    {
+        if ($this->_columns) return $this->_columns;
+        $this->_columns = new LazyCollection(function () {
+            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
+            foreach ($meta->getColumns($this->table) as $column) {
+                yield $column;
+            }
+        });
+        return $this->_columns;
     }
 
     public function column(string $name)
     {
-        return $this->_columns->first(fn($column) => $column->getName() === $name);
+        return $this->columns()->first(fn($column) => $column->getName() === $name);
     }
 
     public function removeColumn(string $table)
     {
+        $this->_columns = null;
+        $this->_constraints = null;
         $table = new Ddl\AlterTable();
         $table->dropColumn($table);
 
         $sql = new \Laminas\Db\Sql\Sql($this->adapter);
-        return $this->adapter->query(
-            $sql->buildSqlString($table),
-            Adapter::QUERY_MODE_EXECUTE
-        );
+        return $this->execute($sql->buildSqlString($table));
     }
 
     public function addColumn(ColumnInterface $column)
     {
+        $this->_columns = null;
+        $this->_constraints = null;
         $table = new Ddl\AlterTable($this->table);
         $table->addColumn($column);
 
@@ -172,7 +152,7 @@ class Table extends TableGateway
 
     function getColumn(string $name)
     {
-        return $this->_columns->first(fn($column) => $column->getName() === $name);
+        return $this->columns()->first(fn($column) => $column->getName() === $name);
     }
 
     function renameColumn(string $oldName, string $newName)
@@ -227,10 +207,15 @@ class Table extends TableGateway
                 break;
         }
 
+        $this->_columns = null;
+
         $alter = new AlterTable($this->table);
         $alter->changeColumn($oldName, $newColumn);
 
         $sql = new Sql($this->adapter);
+
+
+
 
         return $this->execute($sql->buildSqlString($alter));
     }
@@ -247,7 +232,7 @@ class Table extends TableGateway
 
     public function getPrimaryKey()
     {
-        return $this->_constraints->first(fn($constraint) => $constraint->getType() === 'PRIMARY KEY')->getColumns();
+        return $this->getConstraints()->first(fn($constraint) => $constraint->getType() === 'PRIMARY KEY')->getColumns();
     }
 
     public function rows($where)
