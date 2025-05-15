@@ -4,6 +4,7 @@ namespace Light\Db;
 
 use Laminas\Db\Sql\Select;
 use Exception;
+use Illuminate\Support\LazyCollection;
 use IteratorAggregate;
 use Laminas\Db\Adapter\AdapterInterface;
 use Laminas\Db\Sql\Expression;
@@ -49,9 +50,8 @@ class Query extends Select implements IteratorAggregate
         return $this->class;
     }
 
-    public function cursor()
+    private function getExecuteTable()
     {
-     
         if (count($this->columns) == 1 && $this->columns[0] == "*") {
             //get primary key
             $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
@@ -77,11 +77,17 @@ class Query extends Select implements IteratorAggregate
         } else {
             $table = new Table($this->table, $this->adapter);
         }
-        
+        return $table;
+    }
 
-        foreach ($table->selectWith($this) as $row) {
-            yield $row;
-        }
+    public function cursor()
+    {
+        return new LazyCollection(function () {
+            $table = $this->getExecuteTable();
+            foreach ($table->selectWith($this) as $row) {
+                yield $row;
+            }
+        });
     }
 
     /**

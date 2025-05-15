@@ -99,26 +99,11 @@ abstract class Model extends RowGateway
         return static::GetAdapter()->getTable($table);
     }
 
-
-
-    public function populate(array $rowData, $rowExistsInDatabase = false)
-    {
-        return parent::populate($rowData, $rowExistsInDatabase);
-    }
-
     public function exchangeArray($array)
     {
-
         $this->original = $array;
         $r = parent::exchangeArray($array);
         $this->data = [];
-
-        /* //remove data from array except for primary key
-        foreach ($this->data as $key => $value) {
-            if (!in_array($key, $this->primaryKeyColumn)) {
-                unset($this->data[$key]);
-            }
-        } */
         return $r;
     }
 
@@ -129,7 +114,6 @@ abstract class Model extends RowGateway
             'data' => $this->data,
             'changed' => $this->changed,
         ];
-        return array_merge($this->original, $this->data);
     }
 
     /**
@@ -141,6 +125,7 @@ abstract class Model extends RowGateway
      */
     public function __get($name)
     {
+
         $adapter = $this->sql->getAdapter();
 
         $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
@@ -200,8 +185,6 @@ abstract class Model extends RowGateway
         }
 
         return $data[$name] ?? null;
-        $v = parent::__get($name);
-        return $v;
     }
 
     /**
@@ -234,27 +217,15 @@ abstract class Model extends RowGateway
 
     protected function getPrimaryKey()
     {
-        $primaryKey = "";
-        $meta = Factory::createSourceFromAdapter($this->sql->getAdapter());
-        foreach ($meta->getConstraints(static::class) as $constraint) {
-            if ($constraint->getType() == "PRIMARY KEY") {
-                $primaryKey = $constraint->getColumns()[0];
-                break;
-            }
-        }
-        return $primaryKey;
+        return self::_table()->getPrimaryKey()[0];
     }
 
     public function save()
     {
         $key = $this->getPrimaryKey();
 
-        $adapter = $this->sql->getAdapter();
-        $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
-
         foreach ($this->data as $name => $value) {
-            $column = $metadata->getColumn($name, $this->table);
-
+            $column =  self::_table()->column($name);
 
             if ($column->getDataType() == "int" && $value === "") {
                 if ($column->isNullable()) {
@@ -262,8 +233,6 @@ abstract class Model extends RowGateway
                     continue;
                 }
             }
-
-
 
             if ($column->getDataType() == "int" && !$column->isNullable()) {
 
@@ -280,9 +249,6 @@ abstract class Model extends RowGateway
             $this->data[$key] = null;
         }
 
-
-
-
         $result = parent::save();
         $this->changed = $this->data;
         $this->original = array_merge($this->original, $this->data);
@@ -297,10 +263,8 @@ abstract class Model extends RowGateway
      */
     static function Query($predicate = null, $combination = Predicate\PredicateSet::OP_AND)
     {
-        //get class name
-        $class = get_called_class();
-
-        $query = new Query(static::class, $class, self::GetAdapter());
+        $table = self::_table();
+        $query = new Query(static::class, $table->getTable(),  $table->adapter);
         if ($predicate) {
             $query->where($predicate, $combination);
         }
@@ -353,28 +317,15 @@ abstract class Model extends RowGateway
      */
     static function _key()
     {
-        $adapter = self::GetAdapter();
-        $primaryKey = "";
-        $meta = Factory::createSourceFromAdapter($adapter);
-        foreach ($meta->getConstraints(static::class) as $constraint) {
-            if ($constraint->getType() == "PRIMARY KEY") {
-                $primaryKey = $constraint->getColumns()[0];
-                break;
-            }
-        }
-        return $primaryKey;
+        $primaryKey = self::_table()->getPrimaryKey();
+        return $primaryKey[0] ?? null;
     }
 
     // get the attributes of the model
     static function __attribute(?string $name = null)
     {
         if ($name) {
-            foreach (self::__attributes() as $attribute) {
-                if ($attribute->getName() == $name) {
-                    return $attribute;
-                }
-            }
-            return null;
+            return self::_table()->column($name);
         }
 
         return self::__attributes();
@@ -419,17 +370,14 @@ abstract class Model extends RowGateway
 
 
     /**
-     * @deprecated
+     * @deprecated use populate instead
      */
     function bind($rs)
     {
         if (is_object($rs)) { // convert to array
             $rs = (array)$rs;
         }
-
         $this->data = array_merge($this->data, $rs);
-
-
         return $this;
     }
 }
