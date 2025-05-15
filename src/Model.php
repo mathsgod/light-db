@@ -180,20 +180,15 @@ abstract class Model extends RowGateway
      */
     public function __set($name, $value)
     {
-        if (is_array($value)) {
 
-            //check if the value is a json
-            $adapter = $this->sql->getAdapter();
-            $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
-            $column = $metadata->getColumn($name, $this->sql->getTable());
-            if ($column->getDataType() == "json") {
-                $value = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
-            } else {
+        //check if the value is a json
+        $column = self::_table()->column($name);
+        if ($column->getDataType() == "json") {
+            $value = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
+        } else {
+            if (is_array($value)) {
                 $value = implode(",", $value);
             }
-
-
-            return parent::__set($name, $value);
         }
 
         return parent::__set($name, $value);
