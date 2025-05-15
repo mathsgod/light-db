@@ -3,38 +3,18 @@
 namespace Light\Db;
 
 use Illuminate\Support\LazyCollection;
-use Laminas\Db\Adapter\Adapter;
 use Laminas\Db\Sql\Ddl;
 use Laminas\Db\Sql\Ddl\CreateTable;
 use Laminas\Db\Sql\Ddl\DropTable;
 use Laminas\Db\Sql\Sql;
-use Laminas\Db\TableGateway\TableGateway;
+
 use PDO;
 
-class Schema
+class Adapter extends \Laminas\Db\Adapter\Adapter
 {
-    private $adapter;
-    public $_tables;
-    public function __construct(Adapter $adapter)
-    {
-        $this->adapter = $adapter;
+    protected $tables = null;
 
-        $this->_tables = new LazyCollection(function () {
-            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
-            foreach ($meta->getTableNames() as $name) {
-                yield new Table($name, $this->adapter);
-            }
-        });
-
-
-    }
-
-    function getAdapter(): Adapter
-    {
-        return $this->adapter;
-    }
-
-    static function Create(array $options = []): Schema
+    static function Create(array $options = [])
     {
         //load from .env
         if (!isset($_ENV["DATABASE_HOSTNAME"])) {
@@ -68,36 +48,42 @@ class Schema
         }
 
 
-        return new static(new Adapter(
-            [
-                "database" => $name,
-                "hostname" => $host,
-                "username" => $username,
-                "password" => $password,
-                "port" => $port,
-                "charset" => $charset,
-                "driver" => "Pdo_Mysql",
-                "driver_options" => $driver_options
-            ]
-        ));
+        return new static([
+            "database" => $name,
+            "hostname" => $host,
+            "username" => $username,
+            "password" => $password,
+            "port" => $port,
+            "charset" => $charset,
+            "driver" => "Pdo_Mysql",
+            "driver_options" => $driver_options
+        ]);
     }
 
-
-    public function getTableGateway(string $name, $features = null)
+    public function getTable(string $name)
     {
-        return new TableGateway($name, $this->adapter, $features);
+        return $this->getTables()->first(fn($table) => $table->getTable() === $name);
     }
 
-    public function table(string $name)
+    public function getTables()
     {
-        return $this->_tables->first(fn($table) => $table->getTable() === $name);
+        if ($this->tables) return $this->tables;
+        $this->tables = new LazyCollection(function () {
+            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this);
+            foreach ($meta->getTableNames() as $name) {
+                yield new Table($name, $this);
+            }
+        });
+        return $this->tables;
     }
 
 
     public function addTable(Ddl\CreateTable $table)
     {
-        $sql = new \Laminas\Db\Sql\Sql($this->adapter);
-        return $this->adapter->query(
+        $this->tables = null;
+
+        $sql = new \Laminas\Db\Sql\Sql($this);
+        return $this->query(
             $sql->buildSqlString($table),
             Adapter::QUERY_MODE_EXECUTE
         );
@@ -105,8 +91,9 @@ class Schema
 
     public function removeTable(string $name)
     {
-        $sql = new \Laminas\Db\Sql\Sql($this->adapter);
-        return $this->adapter->query(
+        $this->tables = null;
+        $sql = new \Laminas\Db\Sql\Sql($this);
+        return $this->query(
             $sql->buildSqlString(new Ddl\DropTable($name)),
             Adapter::QUERY_MODE_EXECUTE
         );
@@ -114,16 +101,17 @@ class Schema
 
     public function createTable(string $name, callable $call)
     {
+        $this->tables = null;
         $create = new CreateTable($name);
         $call($create);
-        $sql = new Sql($this->adapter);
-        return $this->adapter->query($sql->buildSqlString($create), Adapter::QUERY_MODE_EXECUTE);
+        $sql = new Sql($this);
+        return $this->query($sql->buildSqlString($create), Adapter::QUERY_MODE_EXECUTE);
     }
 
     public function hasTable(string $name): bool
     {
         $has = false;
-        $this->_tables->each(function ($table) use ($name, &$has) {
+        $this->getTables()->each(function ($table) use ($name, &$has) {
             if ($table->getTable() === $name) {
                 $has = true;
             }
@@ -134,7 +122,7 @@ class Schema
     public function dropTable(string $name)
     {
         $drop = new DropTable($name);
-        $sql = new Sql($this->adapter);
-        return $this->adapter->query($sql->buildSqlString($drop), Adapter::QUERY_MODE_EXECUTE);
+        $sql = new Sql($this);
+        return $this->query($sql->buildSqlString($drop), Adapter::QUERY_MODE_EXECUTE);
     }
 }

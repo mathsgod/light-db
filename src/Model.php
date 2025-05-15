@@ -25,8 +25,7 @@ abstract class Model extends RowGateway
         //reflector class
         $ref_class = new ReflectionClass(static::class);
 
-        $schema = self::GetSchema();
-        $adapter = $schema->getAdapter();
+        $adapter = self::GetAdapter();
 
         $primaryKey = "";
         $meta = Factory::createSourceFromAdapter($adapter);
@@ -97,7 +96,7 @@ abstract class Model extends RowGateway
             $table = $props["_table"];
 
 
-        return static::GetSchema()->table($table);
+        return static::GetAdapter()->getTable($table);
     }
 
 
@@ -301,26 +300,26 @@ abstract class Model extends RowGateway
         //get class name
         $class = get_called_class();
 
-        $query = new Query(static::class, $class, self::GetSchema()->getAdapter());
+        $query = new Query(static::class, $class, self::GetAdapter());
         if ($predicate) {
             $query->where($predicate, $combination);
         }
         return $query;
     }
 
-    static $_schema = null;
+    static $_adapter = null;
 
-    static function SetSchema(Schema $schema)
+    static function SetAdapter(Adapter $adapter)
     {
-        self::$_schema = $schema;
+        self::$_adapter = $adapter;
     }
 
-    static function GetSchema(): Schema
+    static function GetAdapter(): Adapter
     {
-        if (self::$_schema == null) {
-            self::$_schema = Schema::Create();
+        if (self::$_adapter == null) {
+            self::$_adapter = Adapter::Create();
         }
-        return self::$_schema;
+        return self::$_adapter;
     }
 
     function wasChanged(?string $name = null): bool
@@ -354,7 +353,7 @@ abstract class Model extends RowGateway
      */
     static function _key()
     {
-        $adapter = self::GetSchema()->getAdapter();
+        $adapter = self::GetAdapter();
         $primaryKey = "";
         $meta = Factory::createSourceFromAdapter($adapter);
         foreach ($meta->getConstraints(static::class) as $constraint) {

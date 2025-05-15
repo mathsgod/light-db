@@ -3,7 +3,8 @@
 declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING);
 
-use Light\Db\Schema;
+use Light\Db\Adapter;
+
 use PHPUnit\Framework\TestCase;
 
 
@@ -11,8 +12,8 @@ final class ColumnTest extends TestCase
 {
     public function testRename()
     {
-        $db = Schema::Create();
-        $table = $db->table("Testing");
+        $db = Adapter::Create();
+        $table = $db->getTable("Testing");
 
         $table->renameColumn("name", "name1");
 

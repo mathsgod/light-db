@@ -17,16 +17,16 @@ final class TableTest extends TestCase
 
     public function testCreate()
     {
-        $db = Testing::GetSchema();
-        $table = $db->table("Testing");
+        $db = Testing::GetAdapter();
+        $table = $db->getTable("Testing");
         $this->assertInstanceOf(Table::class, $table);
     }
 
 
     public function testColumn()
     {
-        $db = Testing::GetSchema();
-        $table = $db->table("Testing");
+        $db = Testing::GetAdapter();
+        $table = $db->getTable("Testing");
         $testing_id_column = $table->column("testing_id");
 
         $this->assertInstanceOf(ColumnObject::class, $testing_id_column);
@@ -37,8 +37,8 @@ final class TableTest extends TestCase
 
     public function testAddDropColumn()
     {
-        $db = Testing::GetSchema();
-        $table = $db->table("Testing");
+        $db = Testing::GetAdapter();
+        $table = $db->getTable("Testing");
 
         if ($table->column("new_column")) {
             $table->dropColumn("new_column");

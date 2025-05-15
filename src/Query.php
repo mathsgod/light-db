@@ -4,24 +4,14 @@ namespace Light\Db;
 
 use Laminas\Db\Sql\Select;
 use Exception;
-use Generator;
 use IteratorAggregate;
 use Laminas\Db\Adapter\AdapterInterface;
-use Laminas\Db\Adapter\Driver\DriverInterface;
-use Laminas\Db\Adapter\ParameterContainer;
-use Laminas\Db\Adapter\Platform\PlatformInterface;
-use Laminas\Db\Sql\Delete;
 use Laminas\Db\Sql\Expression;
-use Laminas\Db\Sql\Update;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
-use Laminas\Db\TableGateway\TableGateway;
-use Laminas\Di\Injector;
 use Laminas\Paginator\Paginator;
 use R\DB\Paginator\Adapter;
 use Traversable;
-use PDO;
 use ReflectionClass;
-use ReflectionParameter;
 
 /**
  * @template T
@@ -33,15 +23,9 @@ use ReflectionParameter;
 class Query extends Select implements IteratorAggregate
 {
     protected $class;
-    protected $statement;
     private $_custom_column = false;
 
     protected $adapter;
-
-    /**
-     * @var \R\DB\Table
-     */
-    protected $_table;
 
     /**
      * @param class-string<T> $class
@@ -127,6 +111,7 @@ class Query extends Select implements IteratorAggregate
     public function first()
     {
         $c = clone $this;
+        $c->offset(0);
         $c->limit(1);
         $result = $c->toArray();
         if (count($result) > 0) {
@@ -135,41 +120,6 @@ class Query extends Select implements IteratorAggregate
         return null;
     }
 
-    /*  // https://github.com/laminas/laminas-db/issues/136
-    protected function processOffset(
-        PlatformInterface $platform,
-        ?DriverInterface $driver = null,
-        ?ParameterContainer $parameterContainer = null
-    ) {
-        if ($this->offset === null) {
-            return;
-        }
-        if ($parameterContainer) {
-            $paramPrefix = $this->processInfo['paramPrefix'];
-            $parameterContainer->offsetSet($paramPrefix . 'offset', $this->offset, ParameterContainer::TYPE_INTEGER);
-            return [$driver->formatParameterName($paramPrefix . 'offset')];
-        }
-
-        return [intval($this->offset)];
-    } */
-    /* 
-    // https://github.com/laminas/laminas-db/issues/136
-    protected function processLimit(
-        PlatformInterface $platform,
-        ?DriverInterface $driver = null,
-        ?ParameterContainer $parameterContainer = null
-    ) {
-        if ($this->limit === null) {
-            return;
-        }
-        if ($parameterContainer) {
-            $paramPrefix = $this->processInfo['paramPrefix'];
-            $parameterContainer->offsetSet($paramPrefix . 'limit', $this->limit, ParameterContainer::TYPE_INTEGER);
-            return [$driver->formatParameterName($paramPrefix . 'limit')];
-        }
-        return [intval($this->limit)];
-    }
- */
     public function collect()
     {
         return $this->execute();
