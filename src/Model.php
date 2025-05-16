@@ -234,11 +234,13 @@ abstract class Model extends RowGateway
                         }
                     }
                 } else {
-                    if ($column->getColumnDefault() === null) {
-                        if (in_array($column->getDataType(), ["int", "tinyint", "smallint", "mediumint", "bigint"])) {
-                            $this->data[$colName] = 0;
-                        } else {
-                            $this->data[$colName] = "";
+                    if (!$this->data[$key]) { // 如果沒有主鍵，則不需要檢查
+                        if ($column->getColumnDefault() === null) {
+                            if (in_array($column->getDataType(), ["int", "tinyint", "smallint", "mediumint", "bigint"])) {
+                                $this->data[$colName] = 0;
+                            } else {
+                                $this->data[$colName] = "";
+                            }
                         }
                     }
                 }
@@ -246,9 +248,9 @@ abstract class Model extends RowGateway
         }
 
 
-        $result = parent::save();
         $this->changed = $this->data;
-        $this->original = array_merge($this->original, $this->data);
+        $result = parent::save();
+        $this->original = $this->data;
         $this->data = [];
 
         return $result;

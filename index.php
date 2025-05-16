@@ -10,6 +10,14 @@ use Light\Db\Model;
 use Light\Db\Schema;
 
 require_once __DIR__ . '/vendor/autoload.php';
+class User extends Model{}
+
+$a = User::Get(1);
+
+$a->save();
+
+print_R($a);
+die;
 
 class Testing5 extends Model{}
 
