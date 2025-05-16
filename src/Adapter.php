@@ -90,6 +90,16 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
         );
     }
 
+    public function getTriggers()
+    {
+        return $this->getMetadata()->getTriggers();
+    }
+
+    public function getMetadata()
+    {
+        return \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this);
+    }
+
     public function removeTable(string $name)
     {
         $this->tables = null;
