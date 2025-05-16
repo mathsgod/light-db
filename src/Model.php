@@ -13,8 +13,8 @@ use ReflectionObject;
 
 abstract class Model extends RowGateway
 {
-    public $original = [];
-    public $changed = [];
+    protected $original = [];
+    protected $changed = [];
 
     /**
      * @return static
@@ -162,10 +162,6 @@ abstract class Model extends RowGateway
                 return $v;
             }
             return $d;
-
-
-            $v = new Proxy($this, $name, parent::__get($name));
-            return $v;
         }
 
         return $data[$name] ?? null;
@@ -180,7 +176,6 @@ abstract class Model extends RowGateway
      */
     public function __set($name, $value)
     {
-
         //check if the value is a json
         $column = self::_table()->column($name);
         if ($column->getDataType() == "json") {
@@ -202,9 +197,11 @@ abstract class Model extends RowGateway
     public function save()
     {
         $key = $this->getPrimaryKey();
+        $table = self::_table();
 
         foreach ($this->data as $name => $value) {
-            $column =  self::_table()->column($name);
+            $column =  $table->column($name);
+            if (!$column) continue;
 
             if ($column->getDataType() == "int" && $value === "") {
                 if ($column->isNullable()) {
@@ -222,11 +219,33 @@ abstract class Model extends RowGateway
             }
         }
 
-        if (array_key_exists($key, $this->original)) {
-            $this->data[$key] = $this->original[$key];
-        } else {
-            $this->data[$key] = null;
+        $this->data[$key] = $this->original[$key];
+
+        foreach ($table->columns() as $column) {
+            $colName = $column->getName();
+            if ($colName == $key) continue;
+
+            if (!$column->isNullable()) {
+                if (array_key_exists($colName, $this->data)) {
+                    if ($this->data[$colName] === null && !$column->getColumnDefault()) {
+                        if (in_array($column->getDataType(), ["int", "tinyint", "smallint", "mediumint", "bigint"])) {
+                            $this->data[$colName] = 0;
+                        } else {
+                            $this->data[$colName] = "";
+                        }
+                    }
+                } else {
+                    if ($column->getColumnDefault() === null) {
+                        if (in_array($column->getDataType(), ["int", "tinyint", "smallint", "mediumint", "bigint"])) {
+                            $this->data[$colName] = 0;
+                        } else {
+                            $this->data[$colName] = "";
+                        }
+                    }
+                }
+            }
         }
+
 
         $result = parent::save();
         $this->changed = $this->data;

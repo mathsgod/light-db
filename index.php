@@ -11,6 +11,30 @@ use Light\Db\Schema;
 
 require_once __DIR__ . '/vendor/autoload.php';
 
+class Testing5 extends Model{}
+class Testing2 extends Model{}
+
+$o = Testing2::Create();
+$o->name = "a";
+$o->int_null = 1;
+
+$o->save();
+
+die();
+
+
+$a=Testing5::Create([
+    "json"=>["a"=>1, "b"=>2],
+]);
+
+$a->json->a=3;
+
+
+$a->save();die();
+
+
+
+
 /* class Profiler implements ProfilerInterface
 {
     public function profilerStart($target)

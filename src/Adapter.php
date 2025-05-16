@@ -61,7 +61,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
         ]);
     }
 
-    public function getTable(string $name)
+    public function getTable(string $name): ?Table
     {
         return $this->getTables()->first(fn($table) => $table->getTable() === $name);
     }
