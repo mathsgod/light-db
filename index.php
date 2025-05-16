@@ -12,6 +12,10 @@ use Light\Db\Schema;
 require_once __DIR__ . '/vendor/autoload.php';
 
 class Testing5 extends Model{}
+
+Testing5::_table()->renameColumn("json2", "json");
+die();
+
 class Testing2 extends Model{}
 
 $o = Testing2::Create();

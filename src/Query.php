@@ -112,7 +112,12 @@ class Query extends Select implements IteratorAggregate
     }
 
     /**
-     * @return T|null
+     * Retrieves the first result from the query, or null if no results are found.
+     *
+     * Clones the current query, sets the offset to 0 and the limit to 1,
+     * then executes the query and returns the first result if available.
+     *
+     * @return T|null The first result of the query, or null if no results exist.
      */
     public function first()
     {
@@ -199,7 +204,11 @@ class Query extends Select implements IteratorAggregate
 
 
     /**
-     * @return T[]
+     * Converts the current query result set to an array.
+     *
+     * Iterates over the query results and returns them as an array of type T.
+     *
+     * @return T[] An array containing all elements from the query result.
      */
     public function toArray()
     {
@@ -222,19 +231,20 @@ class Query extends Select implements IteratorAggregate
         if ($sort) {
             $sorts = explode(",", $sort);
             foreach ($sorts as $sort) {
-                
+
                 //replace ":" to " "
-                $sort=str_replace(":", " ", $sort);
+                $sort = str_replace(":", " ", $sort);
 
                 $query->order($sort);
-                
-/*                 //custom order
+
+                /*                 //custom order
                 if (isset(self::$Order[$this->class][$s[0]])) {
                     $query->order([self::$Order[$this->class][$s[0]]($s[1])]);
                 } else {
                     $query->order($s[0] . " " . $s[1]);
                 }
- */            }
+ */
+            }
         }
         return $query;
     }

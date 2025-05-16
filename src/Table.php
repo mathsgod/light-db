@@ -17,6 +17,7 @@ use Laminas\Db\Sql\Sql;
 use Laminas\Db\TableGateway\Feature\MetadataFeature;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
 use Laminas\Db\Sql\Predicate;
+use stdClass;
 
 class Table extends TableGateway
 {
@@ -181,6 +182,8 @@ class Table extends TableGateway
         $precision = $column->getNumericPrecision();
         $scale = $column->getNumericScale();
 
+
+
         // 根據型別建立對應的 Column 物件
         switch (strtolower($type)) {
             case 'varchar':
@@ -211,10 +214,18 @@ class Table extends TableGateway
             case 'tinyint':
                 $newColumn = new \Laminas\Db\Sql\Ddl\Column\Boolean($newName, $nullable, $default);
                 break;
-            // 其他型別請依需求補齊
+        
             default:
-                // fallback: 用最基本的 Column
-                $newColumn = new Column($newName, $nullable, $default);
+                $newColumn = new class($newName, $nullable, $default, $type) extends Column {
+                    public function __construct($name, $nullable = null, $default = null, $type = null)
+                    {
+                        parent::__construct($name, $nullable, $default);
+                        $this->type = $type;
+                    }
+                };
+
+
+
                 break;
         }
 

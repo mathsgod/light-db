@@ -16,10 +16,7 @@ abstract class Model extends RowGateway
     protected $original = [];
     protected $changed = [];
 
-    /**
-     * @return static
-     */
-    static function Create(?array $data = [])
+    static function Create(?array $data = []): static
     {
 
         //reflector class
@@ -40,7 +37,9 @@ abstract class Model extends RowGateway
         }
 
         foreach ($data as $key => $value) {
-            if ($table->column($key)->getDataType() == "json") {
+            $col = $table->column($key);
+            if (!$col) continue; // 避免不存在欄位
+            if ($col->getDataType() == "json") {
                 if (is_array($value)) {
                     $data[$key] = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
                 }
