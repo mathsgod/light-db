@@ -268,14 +268,14 @@ abstract class Model extends RowGateway
         return $query;
     }
 
-    static $_adapter = null;
+    protected static $_adapter = null;
 
-    static function SetAdapter(Adapter $adapter)
+    public static function SetAdapter(Adapter $adapter)
     {
         self::$_adapter = $adapter;
     }
 
-    static function GetAdapter(): Adapter
+    public static function GetAdapter(): Adapter
     {
         if (self::$_adapter == null) {
             self::$_adapter = Adapter::Create();
