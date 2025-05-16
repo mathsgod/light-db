@@ -12,6 +12,33 @@ use Light\Db\Schema;
 require_once __DIR__ . '/vendor/autoload.php';
 class Testing extends Model {}
 class Testing2 extends Model {}
+class User extends Model {}
+class UserList extends Model {}
+
+
+$u = User::Get(1);
+
+print_r($u->UserList);die;
+
+$a = $u->first_name;
+$this->assertInstanceOf(User::class, $u);
+$this->assertInstanceOf(Light\Db\Query::class, $u->UserList);
+
+
+$ul = $u->UserList->first();
+$this->assertInstanceOf(UserList::class, $ul);
+
+
+$user = $ul->User();
+
+$this->assertInstanceOf(User::class, $user);
+
+
+$b = $user->first_name;
+
+$this->assertEquals($a, $b);
+
+
 
 Testing2::_table()->truncate();
 $o = Testing2::Create();

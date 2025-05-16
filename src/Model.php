@@ -105,12 +105,13 @@ abstract class Model extends RowGateway
     public function &__get($name)
     {
 
-        $adapter = $this->sql->getAdapter();
+        $columns = self::_table()->columns();
 
-        $metadata = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($adapter);
-        $columns = $metadata->getColumnNames($this->sql->getTable());
+        $columnNames = $columns->map(function ($column) {
+            return $column->getName();
+        })->all();
 
-        if (!in_array($name, $columns)) {
+        if (!in_array($name, $columnNames)) {
             //relation
             $ro = new ReflectionObject($this);
 
@@ -124,16 +125,19 @@ abstract class Model extends RowGateway
                 }
             }
             if (!class_exists($class)) {
-                return parent::__get($name);
+                $v = parent::__get($name);
+                return $v;
             }
 
+
             $key = static::_key();
-            return $class::Query([$key => $this->$key]);
+            $v = $class::Query([$key => $this->$key]);
+            return $v;
         }
 
-
-
-        $column = $metadata->getColumn($name, $this->sql->getTable());
+        $column = $columns->first(function ($column) use ($name) {
+            return $column->getName() == $name;
+        });
 
 
         if ($column->getDataType() == "json") {
@@ -179,7 +183,7 @@ abstract class Model extends RowGateway
                 continue;
             }
 
-            if(is_array($value)){
+            if (is_array($value)) {
                 $this->data[$name] = implode(",", $value);
                 continue;
             }
