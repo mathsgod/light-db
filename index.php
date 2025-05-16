@@ -10,21 +10,83 @@ use Light\Db\Model;
 use Light\Db\Schema;
 
 require_once __DIR__ . '/vendor/autoload.php';
-class User extends Model{}
+class Testing extends Model {}
+class Testing2 extends Model {}
+
+Testing2::_table()->truncate();
+$o = Testing2::Create();
+$o->name = ["a", "b", "c"];
+
+
+$o->save();
+$o2 = Testing2::Get(1);
+
+print_r($o2->name);
+
+
+die();
+$t=Testing::Get(1);
+
+print_r($t->j);
+
+$t->j["a"]=3;
+
+print_R($t);
+
+$t->save();
+
+print_R($t);
+die();
+
+$t->save();
+
+$t=Testing::Create([
+    "j" => ["a" => 1, "b" => 2],
+]);
+
+$t->save();
+
+print_R($t);
+die();
 
 $a = User::Get(1);
+
+print_r($a->style);
+
+
+
+//print_r($a->style);
+print_r($a);
+die;
+
+$a->style["card"]["flat"] = 2;
+
+print_r($a->style);
+die();
+
+
+
+//$a->style["card"]["flat"]=2;
+
+print_R($a);
+die;
+
+print_r($a->style);
+
+
+die;
 
 $a->save();
 
 print_R($a);
 die;
 
-class Testing5 extends Model{}
+class Testing5 extends Model {}
 
 Testing5::_table()->renameColumn("json2", "json");
 die();
 
-class Testing2 extends Model{}
+class Testing2 extends Model {}
 
 $o = Testing2::Create();
 $o->name = "a";
@@ -35,14 +97,15 @@ $o->save();
 die();
 
 
-$a=Testing5::Create([
-    "json"=>["a"=>1, "b"=>2],
+$a = Testing5::Create([
+    "json" => ["a" => 1, "b" => 2],
 ]);
 
-$a->json->a=3;
+$a->json->a = 3;
 
 
-$a->save();die();
+$a->save();
+die();
 
 
 
@@ -63,8 +126,9 @@ $a->save();die();
  */
 class User extends Model {}
 $u = User::Get(1);
-print_R($u->style["card"]);die;
-$u->style["card"]="a";
+print_R($u->style["card"]);
+die;
+$u->style["card"] = "a";
 
 print_R($u);
 

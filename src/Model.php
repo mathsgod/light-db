@@ -36,17 +36,7 @@ abstract class Model extends RowGateway
             $obj->original[$column->getName()] = $column->getColumnDefault();
         }
 
-        foreach ($data as $key => $value) {
-            $col = $table->column($key);
-            if (!$col) continue; // 避免不存在欄位
-            if ($col->getDataType() == "json") {
-                if (is_array($value)) {
-                    $data[$key] = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
-                }
-            }
-        }
         $obj->populate($data, false);
-
 
         return $obj;
     }
@@ -112,7 +102,7 @@ abstract class Model extends RowGateway
      * @throws Exception\InvalidArgumentException
      * @return mixed
      */
-    public function __get($name)
+    public function &__get($name)
     {
 
         $adapter = $this->sql->getAdapter();
@@ -146,46 +136,22 @@ abstract class Model extends RowGateway
         $column = $metadata->getColumn($name, $this->sql->getTable());
 
 
+        if ($column->getDataType() == "json") {
+            if (!array_key_exists($name, $this->data)) {
+                $this->data[$name] = json_decode($this->original[$name], true);
+            }
+            return $this->data[$name];
+        }
 
         $data = array_merge($this->original, $this->data);
         if ($column->getDataType() == "tinyint") {
-            return (bool) $data[$name];
+            $v = (bool) $data[$name];
+            return $v;
         }
 
-        if ($column->getDataType() == "json") {
 
-            $d = json_decode($data[$name], true);
-
-            if (is_array($d)) {
-                $v = new Proxy($this, $name, $data[$name]);
-                return $v;
-            }
-            return $d;
-        }
-
-        return $data[$name] ?? null;
-    }
-
-    /**
-     * __set
-     *
-     * @param  string $name
-     * @param  mixed $value
-     * @return void
-     */
-    public function __set($name, $value)
-    {
-        //check if the value is a json
-        $column = self::_table()->column($name);
-        if ($column->getDataType() == "json") {
-            $value = json_encode($value, 0, JSON_UNESCAPED_UNICODE);
-        } else {
-            if (is_array($value)) {
-                $value = implode(",", $value);
-            }
-        }
-
-        return parent::__set($name, $value);
+        $v = $data[$name] ?? null;
+        return $v;
     }
 
     protected function getPrimaryKey()
@@ -201,6 +167,22 @@ abstract class Model extends RowGateway
         foreach ($this->data as $name => $value) {
             $column =  $table->column($name);
             if (!$column) continue;
+
+            if ($column->getDataType() == "json") {
+                //compare to original data ,if not changed, skip
+                if ($this->original[$name] == json_encode($value, JSON_UNESCAPED_UNICODE)) {
+                    unset($this->data[$name]);
+                    continue;
+                }
+
+                $this->data[$name] = json_encode($value, JSON_UNESCAPED_UNICODE);
+                continue;
+            }
+
+            if(is_array($value)){
+                $this->data[$name] = implode(",", $value);
+                continue;
+            }
 
             if ($column->getDataType() == "int" && $value === "") {
                 if ($column->isNullable()) {
@@ -246,7 +228,6 @@ abstract class Model extends RowGateway
                 }
             }
         }
-
 
         $this->changed = $this->data;
         $result = parent::save();

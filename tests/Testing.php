@@ -1,5 +1,5 @@
 <?php
-
+error_reporting(E_ALL);
 use Dotenv\Dotenv;
 
 require_once(__DIR__ . "/Model.php");

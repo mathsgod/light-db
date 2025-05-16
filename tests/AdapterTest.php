@@ -1,7 +1,7 @@
 <?php
 
 declare(strict_types=1);
-error_reporting(E_ALL & ~E_WARNING);
+error_reporting(E_ALL);
 
 use PHPUnit\Framework\TestCase;
 
@@ -12,6 +12,12 @@ use Light\Db\Adapter;
 
 final class AdapterTest extends TestCase
 {
+    public function setUp(): void
+{
+  # Turn on error reporting
+  error_reporting(E_ALL);
+  // ...
+}
     public function testCreate()
     {
         $db = Testing::GetAdapter();

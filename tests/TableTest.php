@@ -1,7 +1,7 @@
 <?php
 
 declare(strict_types=1);
-error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+error_reporting(E_ALL);
 
 use Laminas\Db\Metadata\Object\ColumnObject;
 use Laminas\Db\Sql\Ddl\Column as ColumnColumn;
