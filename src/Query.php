@@ -88,16 +88,9 @@ class Query extends Select implements IteratorAggregate
         return parent::columns($columns, $prefixColumnsWithTable);
     }
 
-    public function count(?string $column = "*"): int
+    public function count(): int
     {
-        $c = clone $this;
-        $c->offset(0);
-        $c->limit(1);
-        $c->columns([
-            "c" => new Expression("count($column)")
-        ]);
-        $table = new Table($this->table, $this->adapter);
-        return $table->selectWith($c)->current()["c"];
+        return $this->_table->count($this->where);
     }
 
     /**
