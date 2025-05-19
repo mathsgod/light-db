@@ -255,6 +255,9 @@ abstract class Model extends RowGateway implements JsonSerializable
         return $query;
     }
 
+    /**
+     * @var Adapter
+     */
     protected static $_adapter = null;
 
     public static function SetAdapter(Adapter $adapter)
