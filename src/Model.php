@@ -4,14 +4,14 @@ namespace Light\Db;
 
 use ArrayObject;
 use Exception;
-use Illuminate\Support\Arr;
-use Laminas\Db\Metadata\Source\Factory;
+use JsonSerializable;
 use Laminas\Db\RowGateway\RowGateway;
 use Laminas\Db\Sql\Predicate;
 use ReflectionClass;
 use ReflectionObject;
+use ReturnTypeWillChange;
 
-abstract class Model extends RowGateway
+abstract class Model extends RowGateway implements JsonSerializable
 {
     protected $original = [];
     protected $changed = [];
@@ -363,5 +363,11 @@ abstract class Model extends RowGateway
         }
         $this->data = array_merge($this->data, $rs);
         return $this;
+    }
+
+    #[ReturnTypeWillChange]
+    function jsonSerialize(): mixed
+    {
+        return array_merge($this->original, $this->data);
     }
 }
