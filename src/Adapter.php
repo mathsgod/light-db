@@ -3,6 +3,7 @@
 namespace Light\Db;
 
 use Illuminate\Support\LazyCollection;
+use Laminas\Db\Adapter\Profiler\ProfilerInterface;
 use Laminas\Db\Sql\Ddl;
 use Laminas\Db\Sql\Ddl\CreateTable;
 use Laminas\Db\Sql\Ddl\DropTable;
@@ -13,9 +14,13 @@ use PDO;
 class Adapter extends \Laminas\Db\Adapter\Adapter
 {
     protected $tables = null;
+    static $instance = null;
 
-    static function Create(array $options = [])
+    static function Create(array $options = [],  ?ProfilerInterface $profiler = null): static
     {
+        if (self::$instance) return self::$instance;
+
+
         //load from .env
         if (!isset($_ENV["DATABASE_HOSTNAME"])) {
             $dotenv = \Dotenv\Dotenv::createImmutable(getcwd());
@@ -43,22 +48,26 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
         ];
 
         if ($options !== null) {
-            foreach ($options as $key => $opt) {
-                $driver_options[$key] = $opt;
-            }
+            $driver_options = array_merge($driver_options, $options);
         }
 
 
-        return new static([
-            "database" => $name,
-            "hostname" => $host,
-            "username" => $username,
-            "password" => $password,
-            "port" => $port,
-            "charset" => $charset,
-            "driver" => $driver,
-            "driver_options" => $driver_options
-        ]);
+        self::$instance = new static(
+            [
+                "database" => $name,
+                "hostname" => $host,
+                "username" => $username,
+                "password" => $password,
+                "port" => $port,
+                "charset" => $charset,
+                "driver" => $driver,
+                "driver_options" => $driver_options
+            ],
+            null,
+            null,
+            $profiler
+        );
+        return self::$instance;
     }
 
     public function getTable(string $name): ?Table
@@ -69,13 +78,13 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
     public function getTables()
     {
         if ($this->tables) return $this->tables;
-        $this->tables = new LazyCollection(function () {
-            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this);
-            foreach ($meta->getTableNames() as $name) {
-                yield new Table($name, $this);
-            }
-        });
-        return $this->tables;
+        $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this);
+        $collect = collect([]);
+
+        foreach ($meta->getTableNames() as $tableName) {
+            $collect->push(new Table($tableName, $this));
+        }
+        return $this->tables = $collect;
     }
 
 
@@ -134,6 +143,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
     {
         $drop = new DropTable($name);
         $sql = new Sql($this);
+        $this->tables = null;
         return $this->query($sql->buildSqlString($drop), Adapter::QUERY_MODE_EXECUTE);
     }
 }

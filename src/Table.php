@@ -24,19 +24,20 @@ class Table extends TableGateway
     protected $_columns = null;
     protected $_constraints = null;
 
-    public function getConstraints()
+    /**
+     * @return \Illuminate\Support\Collection<\Laminas\Db\Metadata\Object\ConstraintObject>
+     */
+    public function getConstraints(): \Illuminate\Support\Collection
     {
         if ($this->_constraints) return $this->_constraints;
-        $this->_constraints = new LazyCollection(function () {
-
-            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
-
-            foreach ($meta->getConstraints($this->table) as $constraint) {
-                yield $constraint;
-            }
-        });
+        $this->_constraints = collect();
+        $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
+        foreach ($meta->getConstraints($this->table) as $constraint) {
+            $this->_constraints->push($constraint);
+        }
         return $this->_constraints;
     }
+
 
     public function removeRow(array $where)
     {
@@ -50,17 +51,16 @@ class Table extends TableGateway
     }
 
     /**
-     * @return \Illuminate\Support\LazyCollection<int, \Laminas\Db\Metadata\Object\ColumnObject>
+     * @return \Illuminate\Support\Collection<\Laminas\Db\Metadata\Object\ColumnObject>
      */
-    public function columns()
+    public function columns(): \Illuminate\Support\Collection
     {
         if ($this->_columns) return $this->_columns;
-        $this->_columns = new LazyCollection(function () {
-            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
-            foreach ($meta->getColumns($this->table) as $column) {
-                yield $column;
-            }
-        });
+        $this->_columns = collect();
+        $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
+        foreach ($meta->getColumns($this->table) as $column) {
+            $this->_columns->push($column);
+        }
         return $this->_columns;
     }
 
@@ -148,6 +148,7 @@ class Table extends TableGateway
         $alter = new AlterTable($this->table);
         $alter->dropColumn($name);
         $sql = new Sql($this->adapter);
+        $this->_columns = null;
         return $this->execute($sql->buildSqlString($alter));
     }
 
@@ -214,7 +215,7 @@ class Table extends TableGateway
             case 'tinyint':
                 $newColumn = new \Laminas\Db\Sql\Ddl\Column\Boolean($newName, $nullable, $default);
                 break;
-        
+
             default:
                 $newColumn = new class($newName, $nullable, $default, $type) extends Column {
                     public function __construct($name, $nullable = null, $default = null, $type = null)
