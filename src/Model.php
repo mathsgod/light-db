@@ -368,6 +368,15 @@ abstract class Model extends RowGateway implements JsonSerializable
     #[ReturnTypeWillChange]
     function jsonSerialize(): mixed
     {
-        return array_merge($this->original, $this->data);
+        $data = $this->original;
+        foreach ($this->_table()->columns() as $column) {
+            $name = $column->getName();
+            if ($column->getDataType() == "json") {
+                $data[$name] = json_decode($this->original[$name], true);
+                continue;
+            }
+        }
+
+        return array_merge($data, $this->data);
     }
 }
