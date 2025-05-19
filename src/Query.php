@@ -127,41 +127,22 @@ class Query extends Select implements IteratorAggregate
 
     public function avg(string $column)
     {
-        $c = clone $this;
-        $c->columns([
-            "c" => new Expression("avg($column)")
-        ]);
-
-        return $this->_table->selectWith($c)->current()["c"];
+        return $this->_table->avg($column, $this->where);
     }
 
     public function sum(string $column)
     {
-        $c = clone $this;
-        $c->columns([
-            "c" => new Expression("sum($column)")
-        ]);
-
-        return $this->_table->selectWith($c)->current()["c"];
+        return $this->_table->sum($column, $this->where);
     }
 
     public function max(string $column)
     {
-        $c = clone $this;
-        $c->columns([
-            "c" => new Expression("max($column)")
-        ]);
-
-        return $this->_table->selectWith($c)->current()["c"];
+        return $this->_table->max($column, $this->where);
     }
 
     public function min(string $column)
     {
-        $c = clone $this;
-        $c->columns([
-            "c" => new Expression("min($column)")
-        ]);
-        return $this->_table->selectWith($c)->current()["c"];
+        return $this->_table->min($column, $this->where);
     }
 
 

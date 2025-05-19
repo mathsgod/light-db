@@ -104,16 +104,19 @@ class Table extends TableGateway
 
         return iterator_to_array($this->selectWith($select))[0]["c"] ?? 0;
     }
-    public function min(string $column)
+    public function min(string $column, $where = null)
     {
         $select = new Select($this->table);
+        if (isset($where)) {
+            $select->where($where);
+        }
         $select->columns([
             "c" => new Expression("min(`$column`)")
         ]);
+        $select->limit(1);
 
         return iterator_to_array($this->selectWith($select))[0]["c"] ?? null;
     }
-
     /**
      * @param Where|\Closure|string|array $where
      */
@@ -127,9 +130,12 @@ class Table extends TableGateway
         return iterator_to_array($this->selectWith($select))[0] ?? null;
     }
 
-    public function avg(string $column)
+    public function avg(string $column, $where = null)
     {
         $select = new Select($this->table);
+        if (isset($where)) {
+            $select->where($where);
+        }
         $select->columns([
             "c" => new Expression("avg(`$column`)")
         ]);
@@ -137,9 +143,25 @@ class Table extends TableGateway
         return iterator_to_array($this->selectWith($select))[0]["c"] ?? null;
     }
 
-    public function top(int $top)
+    public function sum(string $column, $where = null)
     {
         $select = new Select($this->table);
+        if (isset($where)) {
+            $select->where($where);
+        }
+        $select->columns([
+            "c" => new Expression("sum(`$column`)")
+        ]);
+
+        return iterator_to_array($this->selectWith($select))[0]["c"] ?? null;
+    }
+
+    public function top(int $top, $where = null)
+    {
+        $select = new Select($this->table);
+        if (isset($where)) {
+            $select->where($where);
+        }
         $select->limit($top);
         return iterator_to_array($this->selectWith($select));
     }
@@ -306,12 +328,17 @@ class Table extends TableGateway
         return $results->current();
     }
 
-    public function max($column)
+    public function max($column, $where = null)
     {
         $select = new Select($this->table);
+        if (isset($where)) {
+            $select->where($where);
+        }
         $select->columns([
             "c" => new Expression("max(`$column`)")
         ]);
+        $select->limit(1);
+
         return iterator_to_array($this->selectWith($select))[0]["c"] ?? null;
     }
 }
