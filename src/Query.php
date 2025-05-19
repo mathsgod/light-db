@@ -23,9 +23,9 @@ use ReflectionClass;
  */
 class Query extends Select implements IteratorAggregate
 {
-    protected $class;
-    protected $_table;
-    protected $adapter;
+    private $class;
+    private $_table;
+    private $adapter;
     private $_custom_column = false;
 
     /**
