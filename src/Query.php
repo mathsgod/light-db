@@ -132,8 +132,7 @@ class Query extends Select implements IteratorAggregate
             "c" => new Expression("avg($column)")
         ]);
 
-        $table = new Table($this->table, $this->adapter);
-        return $table->selectWith($c)->current()["c"];
+        return $this->_table->selectWith($c)->current()["c"];
     }
 
     public function sum(string $column)
@@ -143,8 +142,7 @@ class Query extends Select implements IteratorAggregate
             "c" => new Expression("sum($column)")
         ]);
 
-        $table = new Table($this->table, $this->adapter);
-        return $table->selectWith($c)->current()["c"];
+        return $this->_table->selectWith($c)->current()["c"];
     }
 
     public function max(string $column)
@@ -154,8 +152,7 @@ class Query extends Select implements IteratorAggregate
             "c" => new Expression("max($column)")
         ]);
 
-        $table = new Table($this->table, $this->adapter);
-        return $table->selectWith($c)->current()["c"];
+        return $this->_table->selectWith($c)->current()["c"];
     }
 
     public function min(string $column)
@@ -164,8 +161,7 @@ class Query extends Select implements IteratorAggregate
         $c->columns([
             "c" => new Expression("min($column)")
         ]);
-        $table = new Table($this->table, $this->adapter);
-        return $table->selectWith($c)->current()["c"];
+        return $this->_table->selectWith($c)->current()["c"];
     }
 
 
