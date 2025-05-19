@@ -201,15 +201,13 @@ class Query extends Select implements IteratorAggregate
                 //replace ":" to " "
                 $sort = str_replace(":", " ", $sort);
 
-                $query->order($sort);
+                $s = explode(" ", $sort);
 
-                /*                 //custom order
-                if (isset(self::$Order[$this->class][$s[0]])) {
+                if (isset(self::$Order[$this->class])) {
                     $query->order([self::$Order[$this->class][$s[0]]($s[1])]);
                 } else {
-                    $query->order($s[0] . " " . $s[1]);
+                    $query->order($sort);
                 }
- */
             }
         }
         return $query;
