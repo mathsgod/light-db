@@ -248,7 +248,7 @@ abstract class Model extends RowGateway
     static function Query($predicate = null, $combination = Predicate\PredicateSet::OP_AND)
     {
         $table = self::_table();
-        $query = new Query(static::class, $table->getTable(),  $table->adapter);
+        $query = new Query(static::class, $table);
         if ($predicate) {
             $query->where($predicate, $combination);
         }

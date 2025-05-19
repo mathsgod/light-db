@@ -24,19 +24,19 @@ use ReflectionClass;
 class Query extends Select implements IteratorAggregate
 {
     protected $class;
-    private $_custom_column = false;
-
+    protected $_table;
     protected $adapter;
+    private $_custom_column = false;
 
     /**
      * @param class-string<T> $class
-     * @param string $table
      */
-    public function __construct(string $class, string $table, AdapterInterface $adapter)
+    public function __construct(string $class, Table $table)
     {
         $this->class = $class;
-        parent::__construct($table);
-        $this->adapter = $adapter;
+        parent::__construct($table->getTable());
+        $this->adapter = $table->getAdapter();
+        $this->_table = $table; // Initialize $_table with the provided Table instance
     }
 
     private static $Order = [];
@@ -54,23 +54,12 @@ class Query extends Select implements IteratorAggregate
     {
         if (count($this->columns) == 1 && $this->columns[0] == "*") {
             //get primary key
-            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
-
-            $primaryKey = "";
-            foreach ($meta->getConstraints($this->table) as $constraint) {
-                if ($constraint->getType() == "PRIMARY KEY") {
-                    $primaryKey = $constraint->getColumns()[0];
-                    break;
-                }
-            }
-            if (!$primaryKey) {
-                throw new Exception("No primary key found for table $this->table");
-            }
+            $primaryKey = $this->_table->getPrimaryKey();
             //reflector class
             $ref_class = new ReflectionClass($this->class);
             $instance = $ref_class->newInstanceArgs([
                 $primaryKey,
-                $this->table,
+                $this->_table->getTable(),
                 $this->adapter
             ]);
             $table = new Table($this->table, $this->adapter, new RowGatewayFeature($instance));
