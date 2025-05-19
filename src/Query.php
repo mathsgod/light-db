@@ -196,7 +196,7 @@ class Query extends Select implements IteratorAggregate
 
                 $s = explode(" ", $sort);
 
-                if (isset(self::$Order[$this->class])) {
+                if (isset(self::$Order[$this->class][$s[0]])) {
                     $query->order([self::$Order[$this->class][$s[0]]($s[1])]);
                 } else {
                     $query->order($sort);
