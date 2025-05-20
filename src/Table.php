@@ -277,7 +277,8 @@ class Table extends TableGateway
 
     public function getPrimaryKey()
     {
-        return $this->getConstraints()->first(fn($constraint) => $constraint->getType() === 'PRIMARY KEY')->getColumns();
+        $primaryKeys = $this->getConstraints()->first(fn($constraint) => $constraint->getType() === 'PRIMARY KEY')->getColumns();
+        return array_unique($primaryKeys);
     }
 
     public function rows($where)
