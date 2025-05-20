@@ -163,6 +163,11 @@ abstract class Model extends RowGateway implements JsonSerializable
             $column =  $table->column($name);
             if (!$column) continue;
 
+            if($column->isVirtualGenerated()) {
+                unset($this->data[$name]);
+                continue;
+            }
+
             if ($column->getDataType() == "json") {
                 //compare to original data ,if not changed, skip
                 if ($this->original[$name] == json_encode($value, JSON_UNESCAPED_UNICODE)) {
@@ -193,6 +198,8 @@ abstract class Model extends RowGateway implements JsonSerializable
                     continue;
                 }
             }
+
+       
         }
 
         $this->data[$key] = $this->original[$key];

@@ -4,12 +4,10 @@ namespace Light\Db;
 
 use Illuminate\Support\LazyCollection;
 use Laminas\Db\Adapter\Adapter;
-use Laminas\Db\Adapter\AdapterInterface;
 use Laminas\Db\RowGateway\RowGateway;
 use Laminas\Db\TableGateway\TableGateway;
 use Laminas\Db\Sql\Ddl;
 use Laminas\Db\Sql\Ddl\AlterTable;
-use Laminas\Db\Sql\Ddl\Column\Column;
 use Laminas\Db\Sql\Ddl\Column\ColumnInterface;
 use Laminas\Db\Sql\Expression;
 use Laminas\Db\Sql\Select;
@@ -17,8 +15,6 @@ use Laminas\Db\Sql\Sql;
 use Laminas\Db\TableGateway\Feature\MetadataFeature;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
 use Laminas\Db\Sql\Predicate;
-use ReflectionClass;
-use stdClass;
 
 class Table extends TableGateway
 {
@@ -52,7 +48,7 @@ class Table extends TableGateway
     }
 
     /**
-     * @return \Illuminate\Support\Collection<\Laminas\Db\Metadata\Object\ColumnObject>
+     * @return \Illuminate\Support\Collection<Column>
      */
     public function columns(): \Illuminate\Support\Collection
     {
@@ -68,9 +64,9 @@ class Table extends TableGateway
                 . " AND `TABLE_SCHEMA` = " . $p->quoteTrustedValue($schema);
 
             $result = $this->adapter->query($sql)->execute();
-            
+
             foreach ($result as $row) {
-                $column= new \Light\Db\Column($row["COLUMN_NAME"],$this->table);
+                $column = new \Light\Db\Column($row["COLUMN_NAME"], $this->table);
                 $column->setOrdinalPosition($row["ORDINAL_POSITION"]);
                 $column->setDataType($row["DATA_TYPE"]);
                 $column->setIsNullable($row["IS_NULLABLE"] === "YES");
@@ -84,17 +80,17 @@ class Table extends TableGateway
 
                 $this->_columns->push($column);
             }
-        }else{
+        } else {
             $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
             foreach ($meta->getColumns($this->table) as $column) {
                 $this->_columns->push($column);
             }
         }
-   
+
         return $this->_columns;
     }
 
-    public function column(string $name): ?\Laminas\Db\Metadata\Object\ColumnObject
+    public function column(string $name): ?Column
     {
         return $this->columns()->first(fn($column) => $column->getName() === $name);
     }
@@ -269,7 +265,7 @@ class Table extends TableGateway
                 break;
 
             default:
-                $newColumn = new class($newName, $nullable, $default, $type) extends Column {
+                $newColumn = new class($newName, $nullable, $default, $type) extends \Laminas\Db\Sql\Ddl\Column\Column {
                     public function __construct($name, $nullable = null, $default = null, $type = null)
                     {
                         parent::__construct($name, $nullable, $default);
