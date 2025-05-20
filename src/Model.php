@@ -30,12 +30,9 @@ abstract class Model extends RowGateway implements JsonSerializable
         $table = self::_table();
 
         $primaryKeys = $table->getPrimaryKey();
-        if (count($primaryKeys) == 0) {
-            throw new \Exception("No primary key found for " . static::class);
-        }
+ 
 
-
-        $obj = $ref_class->newInstance($primaryKeys, static::class, $table->adapter);
+        $obj = $ref_class->newInstance($primaryKeys, $table->getTable(), $table->adapter);
 
         foreach ($table->columns() as $column) {
             $obj->original[$column->getName()] = $column->getColumnDefault();
