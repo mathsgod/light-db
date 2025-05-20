@@ -83,11 +83,14 @@ class Table extends TableGateway
                 $column->setVirtualGenerated($row["EXTRA"] === "VIRTUAL GENERATED");
 
                 $this->_columns->push($column);
-
+            }
+        }else{
+            $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
+            foreach ($meta->getColumns($this->table) as $column) {
+                $this->_columns->push($column);
             }
         }
    
-
         return $this->_columns;
     }
 
