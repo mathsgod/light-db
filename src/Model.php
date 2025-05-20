@@ -127,7 +127,7 @@ abstract class Model extends RowGateway implements JsonSerializable
                 }
             }
             if (!class_exists($class)) {
-                $v = parent::__get($name);
+                $v = null;
                 return $v;
             }
 
