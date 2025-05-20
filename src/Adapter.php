@@ -79,7 +79,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
     {
         if ($this->tables) return $this->tables;
         $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this);
-        $collect = collect([]);
+        $collect = collect();
 
         foreach ($meta->getTableNames() as $tableName) {
             $collect->push(new Table($tableName, $this));
