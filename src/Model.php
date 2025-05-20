@@ -31,7 +31,6 @@ abstract class Model extends RowGateway implements JsonSerializable
 
         $primaryKeys = $table->getPrimaryKey();
 
-
         $obj = $ref_class->newInstance($primaryKeys, $table->getTable(), $table->adapter);
 
         foreach ($table->columns() as $column) {
@@ -367,11 +366,21 @@ abstract class Model extends RowGateway implements JsonSerializable
         foreach ($this->_table()->columns() as $column) {
             $name = $column->getName();
             if ($column->getDataType() == "json") {
-                $data[$name] = json_decode($this->original[$name], true);
+                if ($this->original[$name] == null) {
+                    $data[$name] = null;
+                } else {
+                    $data[$name] = json_decode($this->original[$name], true);
+                }
+
                 continue;
             }
         }
 
         return array_merge($data, $this->data);
+    }
+
+    public function toArray()
+    {
+        return $this->jsonSerialize();
     }
 }

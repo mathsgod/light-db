@@ -17,6 +17,7 @@ use Laminas\Db\Sql\Sql;
 use Laminas\Db\TableGateway\Feature\MetadataFeature;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
 use Laminas\Db\Sql\Predicate;
+use ReflectionClass;
 use stdClass;
 
 class Table extends TableGateway
@@ -57,10 +58,36 @@ class Table extends TableGateway
     {
         if ($this->_columns) return $this->_columns;
         $this->_columns = collect();
-        $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
-        foreach ($meta->getColumns($this->table) as $column) {
-            $this->_columns->push($column);
+
+        $p = $this->adapter->getPlatform();
+        if ($p->getName() == "MySQL") {
+            $schema = $this->adapter->getCurrentSchema();
+
+            $sql = "SELECT * FROM `INFORMATION_SCHEMA`.`COLUMNS`  Where `TABLE_NAME`  = "
+                . $p->quoteTrustedValue($this->table)
+                . " AND `TABLE_SCHEMA` = " . $p->quoteTrustedValue($schema);
+
+            $result = $this->adapter->query($sql)->execute();
+            
+            foreach ($result as $row) {
+                $column= new \Light\Db\Column($row["COLUMN_NAME"],$this->table);
+                $column->setOrdinalPosition($row["ORDINAL_POSITION"]);
+                $column->setDataType($row["DATA_TYPE"]);
+                $column->setIsNullable($row["IS_NULLABLE"] === "YES");
+                $column->setColumnDefault($row["COLUMN_DEFAULT"]);
+                $column->setCharacterMaximumLength($row["CHARACTER_MAXIMUM_LENGTH"]);
+                $column->setCharacterOctetLength($row["CHARACTER_OCTET_LENGTH"]);
+                $column->setNumericPrecision($row["NUMERIC_PRECISION"]);
+                $column->setNumericScale($row["NUMERIC_SCALE"]);
+                $column->setNumericUnsigned(false !== strpos($row['COLUMN_TYPE'], 'unsigned'));
+                $column->setVirtualGenerated($row["EXTRA"] === "VIRTUAL GENERATED");
+
+                $this->_columns->push($column);
+
+            }
         }
+   
+
         return $this->_columns;
     }
 
