@@ -64,7 +64,7 @@ class Table extends TableGateway
         return $this->_columns;
     }
 
-    public function column(string $name)
+    public function column(string $name): ?\Laminas\Db\Metadata\Object\ColumnObject
     {
         return $this->columns()->first(fn($column) => $column->getName() === $name);
     }

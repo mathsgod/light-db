@@ -30,7 +30,7 @@ abstract class Model extends RowGateway implements JsonSerializable
         $table = self::_table();
 
         $primaryKeys = $table->getPrimaryKey();
- 
+
 
         $obj = $ref_class->newInstance($primaryKeys, $table->getTable(), $table->adapter);
 
@@ -106,14 +106,9 @@ abstract class Model extends RowGateway implements JsonSerializable
      */
     public function &__get($name)
     {
+        $column = self::_table()->column($name);
 
-        $columns = self::_table()->columns();
-
-        $columnNames = $columns->map(function ($column) {
-            return $column->getName();
-        })->all();
-
-        if (!in_array($name, $columnNames)) {
+        if (!$column) {
             //relation
             $ro = new ReflectionObject($this);
 
@@ -136,11 +131,6 @@ abstract class Model extends RowGateway implements JsonSerializable
             $v = $class::Query([$key => $this->$key]);
             return $v;
         }
-
-        $column = $columns->first(function ($column) use ($name) {
-            return $column->getName() == $name;
-        });
-
 
         if ($column->getDataType() == "json") {
             if (!array_key_exists($name, $this->data)) {
