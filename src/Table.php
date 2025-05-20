@@ -41,7 +41,7 @@ class Table extends TableGateway
 
     public function removeRow(array $where)
     {
-        $this->delete($where);
+        return $this->delete($where);
     }
 
     public function addRow(array $data)
