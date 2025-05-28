@@ -146,4 +146,19 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
         $this->tables = null;
         return $this->query($sql->buildSqlString($drop), Adapter::QUERY_MODE_EXECUTE);
     }
+
+    public function beginTransaction()
+    {
+        return $this->getDriver()->getConnection()->beginTransaction();
+    }
+
+    public function commit()
+    {
+        return $this->getDriver()->getConnection()->commit();
+    }
+
+    public function rollback()
+    {
+        return $this->getDriver()->getConnection()->rollback();
+    }
 }
