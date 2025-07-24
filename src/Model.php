@@ -159,11 +159,18 @@ abstract class Model extends RowGateway implements JsonSerializable
         $key = $this->getPrimaryKey();
         $table = self::_table();
 
+
+        if ($this->rowExistsInDatabase()) {
+            if (count($this->data) == 0 && count($this->changed) == 0) {
+                return true; // no changes, no need to save
+            }
+        }
+
         foreach ($this->data as $name => $value) {
             $column =  $table->column($name);
             if (!$column) continue;
 
-            if($column->isVirtualGenerated()) {
+            if ($column->isVirtualGenerated()) {
                 unset($this->data[$name]);
                 continue;
             }
@@ -198,9 +205,8 @@ abstract class Model extends RowGateway implements JsonSerializable
                     continue;
                 }
             }
-
-       
         }
+
 
         $this->data[$key] = $this->original[$key];
 
@@ -230,6 +236,7 @@ abstract class Model extends RowGateway implements JsonSerializable
                 }
             }
         }
+
 
         $this->changed = $this->data;
         $result = parent::save();
