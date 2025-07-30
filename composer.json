@@ -27,6 +27,12 @@
         "phpunit/phpunit": "^10.5"
     },
     "scripts": {
-        "test": "phpunit --bootstrap tests\\Testing.php tests"
+        "test": "phpunit",
+        "test-basic": "phpunit --group basic",
+        "test-coverage": "phpunit --coverage-html coverage-report",
+        "test-crud": "phpunit --group crud",
+        "test-json": "phpunit --group json",
+        "test-unit": "phpunit tests/Unit",
+        "test-integration": "phpunit tests/Integration"
     }
 }

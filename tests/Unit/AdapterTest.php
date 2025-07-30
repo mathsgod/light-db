@@ -1,16 +1,13 @@
 <?php
 
 declare(strict_types=1);
-error_reporting(E_ALL);
-
-use PHPUnit\Framework\TestCase;
 
 use Light\Db\Table;
 use Laminas\Db\Sql\Ddl\Column\Column;
 use Laminas\Db\Sql\Ddl\CreateTable;
 use Light\Db\Adapter;
 
-final class AdapterTest extends TestCase
+final class AdapterTest extends BaseTestCase
 {
     public function setUp(): void
 {

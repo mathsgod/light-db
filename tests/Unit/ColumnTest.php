@@ -1,14 +1,10 @@
 <?php
 
 declare(strict_types=1);
-error_reporting(E_ALL);
 
 use Light\Db\Adapter;
 
-use PHPUnit\Framework\TestCase;
-
-
-final class ColumnTest extends TestCase
+final class ColumnTest extends BaseTestCase
 {
     public function testRename()
     {

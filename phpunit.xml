@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php"
+         colors="true"
+         executionOrder="depends,defects"
+         failOnRisky="true"
+         failOnWarning="true">
+    <testsuites>
+        <testsuite name="Light-DB Test Suite">
+            <directory>tests/Unit</directory>
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+    
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    
+    <coverage includeUncoveredFiles="true">
+        <report>
+            <html outputDirectory="coverage-report"/>
+            <text outputFile="php://stdout" showUncoveredFiles="false"/>
+        </report>
+    </coverage>
+</phpunit>
