@@ -191,6 +191,9 @@ final class RelationshipTest extends BaseTestCase
 
     private function seedComplexTestData(): void
     {
+        // Clear existing data first
+        Testing::_table()->delete([]);
+        
         for ($i = 1; $i <= 5; $i++) {
             $model = Testing::Create([
                 'name' => "integration_test_{$i}",

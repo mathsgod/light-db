@@ -16,11 +16,4 @@
             <directory>src</directory>
         </include>
     </source>
-    
-    <coverage includeUncoveredFiles="true">
-        <report>
-            <html outputDirectory="coverage-report"/>
-            <text outputFile="php://stdout" showUncoveredFiles="false"/>
-        </report>
-    </coverage>
 </phpunit>

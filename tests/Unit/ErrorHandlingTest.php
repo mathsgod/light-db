@@ -63,9 +63,29 @@ final class ErrorHandlingTest extends BaseTestCase
      */
     public function testSaveWithConstraintViolation(): void
     {
-        // This test depends on your database schema constraints
-        // Skip if no constraints are defined
-        $this->markTestSkipped('Constraint violation tests depend on specific database schema');
+        // Test duplicate primary key violation
+        $model1 = Testing::Create(['name' => 'constraint_test_1']);
+        $model1->save();
+        
+        try {
+            // Try to manually set the same primary key (this should fail)
+            $model2 = Testing::Create(['name' => 'constraint_test_2']);
+            $model2->testing_id = $model1->testing_id; // Set same ID
+            $model2->save();
+            
+            // If we get here, the constraint didn't work as expected
+            $this->fail('Expected constraint violation did not occur');
+        } catch (Exception $e) {
+            // Expected exception due to duplicate primary key
+            $this->assertInstanceOf(Exception::class, $e);
+        } finally {
+            // Cleanup
+            try {
+                $model1->delete();
+            } catch (Exception $e) {
+                // Ignore cleanup errors
+            }
+        }
     }
 
     /**
