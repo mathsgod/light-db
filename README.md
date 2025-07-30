@@ -1,4 +1,3 @@
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/mathsgod/light-db)
 [![GitHub](https://img.shields.io/github/license/mathsgod/light-db)](https://github.com/mathsgod/light-db)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://www.php.net/)
 
