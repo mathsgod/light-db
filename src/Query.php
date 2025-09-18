@@ -339,15 +339,22 @@ class Query extends Select implements IteratorAggregate
             }
         }
     }
-
-
+    /**
+     * Applies multiple filters to the query.
+     *
+     * Clones the current query, processes the provided filters, and returns a new query instance with the applied filters.
+     *
+     * @param array|null $filters An associative array of filters to apply. Each key is a field name, and each value is either a value or an array of conditions.
+     *                            Special keys like `_or` and `_and` can be used for logical grouping of conditions.
+     * @return static A new query instance with the applied filters.
+     */
     public function filters(?array $filters)
     {
         $query = clone $this;
         $this->processFilter($query->where, $filters);
-        echo $query->getSqlString($this->adapter->getPlatform()) . "\n";
         return $query;
     }
+
     public function filter(callable $filter)
     {
         return collect($this)->filter($filter);
