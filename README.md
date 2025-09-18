@@ -101,7 +101,7 @@ $activeUsers = User::Query()
     ->filters([
         'age' => ['gte' => 18, 'lte' => 65],
         'status' => ['in' => ['active', 'premium']],
-        'email' => ['like' => '%@gmail.com']
+        'email' => ['contains' => '@gmail.com']
     ])
     ->sort('created_at:desc')
     ->toArray();
@@ -148,7 +148,7 @@ $query = User::Query()->filters([
     'rating' => ['lt' => 5],         // Less than
     'points' => ['lte' => 100],      // Less than or equal
     'status' => ['in' => ['active', 'premium']], // In array
-    'name' => ['like' => '%john%'],  // Like pattern
+    'name' => ['contains' => 'john'],  // Contains pattern
     'category' => ['ne' => 'spam']   // Not equal
 ]);
 ```
