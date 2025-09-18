@@ -8,6 +8,7 @@ use Illuminate\Support\LazyCollection;
 use IteratorAggregate;
 use Laminas\Db\Adapter\AdapterInterface;
 use Laminas\Db\Sql\Expression;
+use Laminas\Db\Sql\Predicate\Predicate;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
 use Laminas\Paginator\Paginator;
 use Light\Db\Paginator\Adapter;
@@ -206,64 +207,113 @@ class Query extends Select implements IteratorAggregate
         return $query;
     }
 
-    public function filters(?array $filters)
+    private function processFilter(Predicate $where, $filter)
     {
-        $query = clone $this;
-        foreach ($filters ?? [] as $field => $filter) {
+        //check $filter is numberic array
+        if (array_values($filter) === $filter) {
+            foreach ($filter as $f) {
+                $this->processFilter($where, $f);
+            }
+            return;
+        }
 
-            if (is_array($filter)) {
+        foreach ($filter as $k => $v) {
+            if ($k == "_or") {
+                $orPredicate = $where->nest();
 
+                $isFirst = true;
+                foreach ($v as $orCondition) {
+                    if (!$isFirst) {
+                        $orPredicate = $orPredicate->or;
+                    }
+                    $this->processFilter($orPredicate, $orCondition);
+                    $isFirst = false;
+                }
+                $orPredicate->unnest();
+                continue;
+            }
 
+            // 添加 _and 支援
+            if ($k == "_and") {
+                $andPredicate = $where->nest();
 
-                foreach ($filter as $operator => $value) {
+                $isFirst = true;
+                foreach ($v as $andCondition) {
+                    if (!$isFirst) {
+                        $andPredicate = $andPredicate->and;
+                    }
+                    $this->processFilter($andPredicate, $andCondition);
+                    $isFirst = false;
+                }
+                $andPredicate->unnest();
+                continue;
+            }
 
-                    if ($operator == 'eq') {
-                        $query->where->equalTo($field, $value);
+            if (is_array($v)) {
+                foreach ($v as $operator => $value) {
+                    if ($operator == '_contains' || $operator == 'contains') {
+                        $where->like($k, "%$value%");
+                        continue;
                     }
 
-                    if ($operator == 'contains') {
-                        $query->where->like($field, "%$value%");
+                    if ($operator == 'eq' || $operator == "_eq") {
+                        $where->equalTo($k, $value);
+                        continue;
                     }
 
-                    if ($operator == 'in') {
-                        $query->where->in($field, $value);
+                    if ($operator == 'in' || $operator == "_in") {
+                        $where->in($k, $value);
+                        continue;
                     }
 
-                    if ($operator == 'between') {
-                        $query->where->between($field, $value[0], $value[1]);
+                    if ($operator == 'between' || $operator == "_between") {
+                        $where->between($k, $value[0], $value[1]);
+                        continue;
                     }
 
-                    if ($operator == 'gt') {
-                        $query->where->greaterThan($field, $value);
+                    if ($operator == 'gt' || $operator == 'gt') {
+                        $where->greaterThan($k, $value);
+                        continue;
                     }
 
-                    if ($operator == 'gte') {
-                        $query->where->greaterThanOrEqualTo($field, $value);
+                    if ($operator == 'gte' || $operator == 'gte') {
+                        $where->greaterThanOrEqualTo($k, $value);
+                        continue;
                     }
 
-                    if ($operator == 'lt') {
-                        $query->where->lessThan($field, $value);
+                    if ($operator == 'lt' || $operator == 'lt') {
+                        $where->lessThan($k, $value);
+                        continue;
                     }
 
-                    if ($operator == 'lte') {
-                        $query->where->lessThanOrEqualTo($field, $value);
+                    if ($operator == 'lte' || $operator == 'lte') {
+                        $where->lessThanOrEqualTo($k, $value);
+                        continue;
                     }
 
-                    if ($operator == 'ne') {
-                        $query->where->notEqualTo($field, $value);
+                    if ($operator == 'ne' || $operator == 'ne') {
+                        $where->notEqualTo($k, $value);
+                        continue;
                     }
 
-                    if ($operator == 'nin') {
-                        $query->where->notIn($field, $value);
+                    if ($operator == 'nin' || $operator == "_nin") {
+                        $where->notIn($k, $value);
+                        continue;
                     }
                 }
             } else {
-                $query->where->equalTo($field, $filter);
+                $where->equalTo($k, $v);
             }
         }
-        return $query;
     }
 
+
+    public function filters(?array $filters)
+    {
+        $query = clone $this;
+        $this->processFilter($query->where, $filters);
+        return $query;
+    }
     public function filter(callable $filter)
     {
         return collect($this)->filter($filter);
