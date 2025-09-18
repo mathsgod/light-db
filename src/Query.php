@@ -207,6 +207,52 @@ class Query extends Select implements IteratorAggregate
         return $query;
     }
 
+    private function applyOperator(Predicate $where, $field, $operator, $value)
+    {
+        switch ($operator) {
+            case '_contains':
+            case 'contains':
+                $where->like($field, "%$value%");
+                break;
+            case 'eq':
+            case "_eq":
+                $where->equalTo($field, $value);
+                break;
+            case 'in':
+            case "_in":
+                $where->in($field, $value);
+                break;
+            case 'between':
+            case "_between":
+                $where->between($field, $value[0], $value[1]);
+                break;
+            case 'gt':
+            case "_gt":
+                $where->greaterThan($field, $value);
+                break;
+            case 'gte':
+            case "_gte":
+                $where->greaterThanOrEqualTo($field, $value);
+                break;
+            case 'lt':
+            case "_lt":
+                $where->lessThan($field, $value);
+                break;
+            case 'lte':
+            case "_lte":
+                $where->lessThanOrEqualTo($field, $value);
+                break;
+            case 'ne':
+            case "_ne":
+                $where->notEqualTo($field, $value);
+                break;
+            case 'nin':
+            case "_nin":
+                $where->notIn($field, $value);
+                break;
+        }
+    }
+
     private function processFilter(Predicate $where, $filter)
     {
         //check $filter is numberic array
@@ -250,55 +296,22 @@ class Query extends Select implements IteratorAggregate
             }
 
             if (is_array($v)) {
-                foreach ($v as $operator => $value) {
-                    if ($operator == '_contains' || $operator == 'contains') {
-                        $where->like($k, "%$value%");
-                        continue;
+                // 檢查是否為數字索引陣列（多個條件）
+                if (array_values($v) === $v) {
+                    // 這是多個條件的陣列，用 AND 連接
+                    foreach ($v as $condition) {
+                        if (is_array($condition)) {
+                            foreach ($condition as $operator => $value) {
+                                $this->applyOperator($where, $k, $operator, $value);
+                            }
+                        } else {
+                            $where->equalTo($k, $condition);
+                        }
                     }
-
-                    if ($operator == 'eq' || $operator == "_eq") {
-                        $where->equalTo($k, $value);
-                        continue;
-                    }
-
-                    if ($operator == 'in' || $operator == "_in") {
-                        $where->in($k, $value);
-                        continue;
-                    }
-
-                    if ($operator == 'between' || $operator == "_between") {
-                        $where->between($k, $value[0], $value[1]);
-                        continue;
-                    }
-
-                    if ($operator == 'gt' || $operator == 'gt') {
-                        $where->greaterThan($k, $value);
-                        continue;
-                    }
-
-                    if ($operator == 'gte' || $operator == 'gte') {
-                        $where->greaterThanOrEqualTo($k, $value);
-                        continue;
-                    }
-
-                    if ($operator == 'lt' || $operator == 'lt') {
-                        $where->lessThan($k, $value);
-                        continue;
-                    }
-
-                    if ($operator == 'lte' || $operator == 'lte') {
-                        $where->lessThanOrEqualTo($k, $value);
-                        continue;
-                    }
-
-                    if ($operator == 'ne' || $operator == 'ne') {
-                        $where->notEqualTo($k, $value);
-                        continue;
-                    }
-
-                    if ($operator == 'nin' || $operator == "_nin") {
-                        $where->notIn($k, $value);
-                        continue;
+                } else {
+                    // 這是單一條件物件
+                    foreach ($v as $operator => $value) {
+                        $this->applyOperator($where, $k, $operator, $value);
                     }
                 }
             } else {
@@ -312,6 +325,7 @@ class Query extends Select implements IteratorAggregate
     {
         $query = clone $this;
         $this->processFilter($query->where, $filters);
+        echo $query->getSqlString($this->adapter->getPlatform()) . "\n";
         return $query;
     }
     public function filter(callable $filter)
