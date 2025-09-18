@@ -209,7 +209,14 @@ class Query extends Select implements IteratorAggregate
 
     private function applyOperator(Predicate $where, $field, $operator, $value)
     {
+
         switch ($operator) {
+            case "_notBetween":
+                $where->notBetween($field, $value[0], $value[1]);
+                break;
+            case "_notContains":
+                $where->notLike($field, "%$value%");
+                break;
             case '_contains':
             case 'contains':
                 $where->like($field, "%$value%");
@@ -248,7 +255,20 @@ class Query extends Select implements IteratorAggregate
                 break;
             case 'nin':
             case "_nin":
+            case "_notIn":
                 $where->notIn($field, $value);
+                break;
+            case "_null":
+                $where->isNull($field);
+                break;
+            case "_notNull":
+                $where->isNotNull($field);
+                break;
+            case "_startsWith":
+                $where->like($field, "$value%");
+                break;
+            case "_endsWith":
+                $where->like($field, "%$value");
                 break;
         }
     }
