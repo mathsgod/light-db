@@ -275,6 +275,9 @@ class Query extends Select implements IteratorAggregate
 
     private function processFilter(Predicate $where, $filter)
     {
+        if ($filter === null) {
+            return;
+        }
         //check $filter is numberic array
         if (array_values($filter) === $filter) {
             foreach ($filter as $f) {
