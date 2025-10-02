@@ -17,13 +17,9 @@ abstract class Model extends RowGateway implements JsonSerializable
     protected $original = [];
     protected $changed = [];
 
-    static function RegisterFilter(string $name, string|Expression $expression)
+    static function RegisterFilter(string $name, callable $callback)
     {
-        if (is_string($expression)) {
-            $expression = new Expression($expression);
-        }
-
-        Query::RegisterFilter(get_called_class(), $name, $expression);
+        Query::RegisterFilter(get_called_class(), $name, $callback);
     }
 
     static function RegisterOrder(string $name, callable $callback)

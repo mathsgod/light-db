@@ -49,9 +49,9 @@ class Query extends Select implements IteratorAggregate
 
 
     private static $Filters = [];
-    static function RegisterFilter(string $class, string $name, Expression $expression)
+    static function RegisterFilter(string $class, string $name, callable $callback)
     {
-        self::$Filters[$class][$name] = $expression;
+        self::$Filters[$class][$name] = $callback;
     }
 
     public function getClassName()
@@ -329,12 +329,15 @@ class Query extends Select implements IteratorAggregate
             }
 
             if (isset(self::$Filters[$this->class][$k])) {
-                $exp = self::$Filters[$this->class][$k];
+                $exp = self::$Filters[$this->class][$k]($v);
             } else {
                 $exp = $k;
             }
 
-            if (is_array($v)) {
+            // If the expression is a callable result (like a subquery string), use it as a literal expression
+            if (isset(self::$Filters[$this->class][$k])) {
+                $where->literal($exp);
+            } elseif (is_array($v)) {
 
 
 
