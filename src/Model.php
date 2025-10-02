@@ -6,6 +6,7 @@ use ArrayObject;
 use Exception;
 use JsonSerializable;
 use Laminas\Db\RowGateway\RowGateway;
+use Laminas\Db\Sql\Expression;
 use Laminas\Db\Sql\Predicate;
 use ReflectionClass;
 use ReflectionObject;
@@ -15,6 +16,15 @@ abstract class Model extends RowGateway implements JsonSerializable
 {
     protected $original = [];
     protected $changed = [];
+
+    static function RegisterFilter(string $name, string|Expression $expression)
+    {
+        if (is_string($expression)) {
+            $expression = new Expression($expression);
+        }
+
+        Query::RegisterFilter(get_called_class(), $name, $expression);
+    }
 
     static function RegisterOrder(string $name, callable $callback)
     {

@@ -12,6 +12,7 @@ use Laminas\Db\Sql\Predicate\Predicate;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
 use Laminas\Paginator\Paginator;
 use Light\Db\Paginator\Adapter;
+use PhpParser\Node\Expr;
 use Traversable;
 use ReflectionClass;
 
@@ -44,6 +45,13 @@ class Query extends Select implements IteratorAggregate
     static function RegisterOrder(string $class, string $name, callable $callback)
     {
         self::$Order[$class][$name] = $callback;
+    }
+
+
+    private static $Filters = [];
+    static function RegisterFilter(string $class, string $name, Expression $expression)
+    {
+        self::$Filters[$class][$name] = $expression;
     }
 
     public function getClassName()
@@ -190,7 +198,7 @@ class Query extends Select implements IteratorAggregate
         $query = clone $this;
         if ($sort) {
             $sorts = explode(",", $sort);
-            
+
             foreach ($sorts as $sort) {
                 $sort = trim($sort);
 
@@ -320,14 +328,23 @@ class Query extends Select implements IteratorAggregate
                 continue;
             }
 
+            if (isset(self::$Filters[$this->class][$k])) {
+                $exp = self::$Filters[$this->class][$k];
+            } else {
+                $exp = $k;
+            }
+
             if (is_array($v)) {
+
+
+
                 // 檢查是否為數字索引陣列（多個條件）
                 if (array_values($v) === $v) {
                     // 這是多個條件的陣列，用 AND 連接
                     foreach ($v as $condition) {
                         if (is_array($condition)) {
                             foreach ($condition as $operator => $value) {
-                                $this->applyOperator($where, $k, $operator, $value);
+                                $this->applyOperator($where, $exp, $operator, $value);
                             }
                         } else {
                             $where->equalTo($k, $condition);
@@ -336,11 +353,11 @@ class Query extends Select implements IteratorAggregate
                 } else {
                     // 這是單一條件物件
                     foreach ($v as $operator => $value) {
-                        $this->applyOperator($where, $k, $operator, $value);
+                        $this->applyOperator($where, $exp, $operator, $value);
                     }
                 }
             } else {
-                $where->equalTo($k, $v);
+                $where->equalTo($exp, $v);
             }
         }
     }
