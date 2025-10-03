@@ -59,48 +59,63 @@ class FilterHelper
     {
         switch ($operator) {
             case '_contains':
+            case 'contains':                
                 $where->like($field, "%$value%");
                 break;
             case '_startsWith':
+            case 'startsWith':
                 $where->like($field, "$value%");
                 break;
             case '_endsWith':
+            case 'endsWith':
                 $where->like($field, "%$value");
                 break;
             case '_in':
+            case 'in':
                 $where->in($field, $value);
                 break;
             case '_notIn':
+            case 'notIn':
                 $where->notIn($field, $value);
                 break;
             case '_eq':
+            case 'eq':
                 $where->equalTo($field, $value);
                 break;
             case '_ne':
+            case 'ne':
                 $where->notEqualTo($field, $value);
                 break;
             case '_gt':
+            case 'gt':
                 $where->greaterThan($field, $value);
                 break;
             case '_gte':
+            case 'gte':
                 $where->greaterThanOrEqualTo($field, $value);
                 break;
             case '_lt':
+            case 'lt':
                 $where->lessThan($field, $value);
                 break;
             case '_lte':
+            case 'lte':
                 $where->lessThanOrEqualTo($field, $value);
                 break;
             case '_between':
+            case 'between':
                 $where->between($field, $value[0], $value[1]);
                 break;
             case '_notBetween':
+            case 'notBetween':
                 $where->notBetween($field, $value[0], $value[1]);
                 break;
             case '_null':
+            case 'null':
                 $where->isNull($field);
                 break;
             case '_notNull':
+            case 'notNull':                
                 $where->isNotNull($field);
                 break;
         }
