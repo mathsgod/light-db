@@ -7,6 +7,7 @@ use Exception;
 use Illuminate\Support\LazyCollection;
 use IteratorAggregate;
 use Laminas\Db\Adapter\AdapterInterface;
+use Laminas\Db\Adapter\Platform\PlatformInterface;
 use Laminas\Db\Sql\Expression;
 use Laminas\Db\Sql\Predicate\Predicate;
 use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
@@ -39,6 +40,12 @@ class Query extends Select implements IteratorAggregate
         parent::__construct($table->getTable());
         $this->adapter = $table->getAdapter();
         $this->_table = $table; // Initialize $_table with the provided Table instance
+    }
+
+    public function getSqlString(?PlatformInterface $adapterPlatform = null)
+    {
+        $adapterPlatform = $adapterPlatform ?:  $this->adapter->getPlatform();
+        return $this->buildSqlString($adapterPlatform);
     }
 
     private static $Order = [];
@@ -283,6 +290,8 @@ class Query extends Select implements IteratorAggregate
         }
     }
 
+    
+
     private function processFilter(Predicate $where, $filter)
     {
         if ($filter === null) {
@@ -336,6 +345,12 @@ class Query extends Select implements IteratorAggregate
 
             // If the expression is a callable result (like a subquery string), use it as a literal expression
             if (isset(self::$Filters[$this->class][$k])) {
+
+                if($exp instanceof Predicate) {
+                    $where->addPredicate($exp);
+                    continue;
+                }
+                
                 $where->literal($exp);
             } elseif (is_array($v)) {
 
