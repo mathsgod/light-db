@@ -224,73 +224,6 @@ class Query extends Select implements IteratorAggregate
         return $query;
     }
 
-    private function applyOperator(Predicate $where, $field, $operator, $value)
-    {
-
-        switch ($operator) {
-            case "_notBetween":
-                $where->notBetween($field, $value[0], $value[1]);
-                break;
-            case "_notContains":
-                $where->notLike($field, "%$value%");
-                break;
-            case '_contains':
-            case 'contains':
-                $where->like($field, "%$value%");
-                break;
-            case 'eq':
-            case "_eq":
-                $where->equalTo($field, $value);
-                break;
-            case 'in':
-            case "_in":
-                $where->in($field, $value);
-                break;
-            case 'between':
-            case "_between":
-                $where->between($field, $value[0], $value[1]);
-                break;
-            case 'gt':
-            case "_gt":
-                $where->greaterThan($field, $value);
-                break;
-            case 'gte':
-            case "_gte":
-                $where->greaterThanOrEqualTo($field, $value);
-                break;
-            case 'lt':
-            case "_lt":
-                $where->lessThan($field, $value);
-                break;
-            case 'lte':
-            case "_lte":
-                $where->lessThanOrEqualTo($field, $value);
-                break;
-            case 'ne':
-            case "_ne":
-                $where->notEqualTo($field, $value);
-                break;
-            case 'nin':
-            case "_nin":
-            case "_notIn":
-                $where->notIn($field, $value);
-                break;
-            case "_null":
-                $where->isNull($field);
-                break;
-            case "_notNull":
-                $where->isNotNull($field);
-                break;
-            case "_startsWith":
-                $where->like($field, "$value%");
-                break;
-            case "_endsWith":
-                $where->like($field, "%$value");
-                break;
-        }
-    }
-
-    
 
     private function processFilter(Predicate $where, $filter)
     {
@@ -353,27 +286,9 @@ class Query extends Select implements IteratorAggregate
                 
                 $where->literal($exp);
             } elseif (is_array($v)) {
-
-
-
-                // 檢查是否為數字索引陣列（多個條件）
-                if (array_values($v) === $v) {
-                    // 這是多個條件的陣列，用 AND 連接
-                    foreach ($v as $condition) {
-                        if (is_array($condition)) {
-                            foreach ($condition as $operator => $value) {
-                                $this->applyOperator($where, $exp, $operator, $value);
-                            }
-                        } else {
-                            $where->equalTo($k, $condition);
-                        }
-                    }
-                } else {
-                    // 這是單一條件物件
-                    foreach ($v as $operator => $value) {
-                        $this->applyOperator($where, $exp, $operator, $value);
-                    }
-                }
+                // 使用 FilterHelper 處理複雜的過濾條件
+                $filterPredicate = FilterHelper::processFilterValue($exp, $v);
+                $where->addPredicate($filterPredicate);
             } else {
                 $where->equalTo($exp, $v);
             }
