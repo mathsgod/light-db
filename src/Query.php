@@ -247,7 +247,14 @@ class Query extends Select implements IteratorAggregate
                     if (!$isFirst) {
                         $orPredicate = $orPredicate->or;
                     }
-                    $this->processFilter($orPredicate, $orCondition);
+                    
+                    // 對於 OR 條件，我們需要為每個子條件創建一個嵌套的 predicate
+                    if (is_array($orCondition) && count($orCondition) > 0) {
+                        $subPredicate = $orPredicate->nest();
+                        $this->processFilter($subPredicate, $orCondition);
+                        $subPredicate->unnest();
+                    }
+                    
                     $isFirst = false;
                 }
                 $orPredicate->unnest();
