@@ -307,6 +307,10 @@ abstract class Model extends RowGateway implements JsonSerializable
         return $this->data;
     }
 
+    function _id(){
+        return $this->{$this->primaryKeyColumn[0]};
+    }
+
     /**
      * get the primary key of the model,
      * if the model has no primary key, return null,
