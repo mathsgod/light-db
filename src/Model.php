@@ -307,7 +307,8 @@ abstract class Model extends RowGateway implements JsonSerializable
         return $this->data;
     }
 
-    function _id(){
+    function _id()
+    {
         return $this->{$this->primaryKeyColumn[0]};
     }
 
@@ -406,5 +407,15 @@ abstract class Model extends RowGateway implements JsonSerializable
     public function toArray()
     {
         return $this->jsonSerialize();
+    }
+
+    public function __isset($key)
+    {
+        $column = self::_table()->column($key);
+        if ($column) {
+            return true;
+        }
+
+        return false;
     }
 }
