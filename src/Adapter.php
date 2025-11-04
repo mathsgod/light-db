@@ -74,6 +74,12 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
 
         return self::$instance;
     }
+    
+    public function disconnect()
+    {
+        $this->getDriver()->getConnection()->disconnect();
+        self::$instance = null;
+    }
 
     public function getTable(string $name): ?Table
     {
