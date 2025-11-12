@@ -21,4 +21,16 @@ class Column extends ColumnObject
         $this->isVirtualGenerated = $isVirtualGenerated;
     }
 
+    /** @var bool */
+    protected $isAutoIncrement = false;
+
+    public function isAutoIncrement(): bool
+    {
+        return $this->isAutoIncrement;
+    }
+
+    public function setAutoIncrement(bool $isAutoIncrement): void
+    {
+        $this->isAutoIncrement = $isAutoIncrement;
+    }
 }

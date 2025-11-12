@@ -77,6 +77,7 @@ class Table extends TableGateway
                 $column->setNumericScale($row["NUMERIC_SCALE"]);
                 $column->setNumericUnsigned(false !== strpos($row['COLUMN_TYPE'], 'unsigned'));
                 $column->setVirtualGenerated($row["EXTRA"] === "VIRTUAL GENERATED");
+                $column->setAutoIncrement($row["EXTRA"] === "auto_increment");
 
                 $this->_columns->push($column);
             }
