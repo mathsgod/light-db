@@ -70,7 +70,18 @@ class Table extends TableGateway
                 $column->setOrdinalPosition($row["ORDINAL_POSITION"]);
                 $column->setDataType($row["DATA_TYPE"]);
                 $column->setIsNullable($row["IS_NULLABLE"] === "YES");
-                $column->setColumnDefault($row["COLUMN_DEFAULT"]);
+                if (
+                    $row["EXTRA"] == "auto_increment"
+                    || $row["EXTRA"] == "VIRTUAL GENERATED"
+                    || $row["EXTRA"] == "DEFAULT_GENERATED"
+                    || $row["EXTRA"] == "STORED GENERATED"
+                ) {
+                    $column->setColumnDefault(null);
+                } else {
+                    $column->setColumnDefault($row["COLUMN_DEFAULT"]);
+                }
+
+
                 $column->setCharacterMaximumLength($row["CHARACTER_MAXIMUM_LENGTH"]);
                 $column->setCharacterOctetLength($row["CHARACTER_OCTET_LENGTH"]);
                 $column->setNumericPrecision($row["NUMERIC_PRECISION"]);
