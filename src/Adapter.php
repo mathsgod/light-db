@@ -15,6 +15,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
 {
     protected $tables = null;
     static $instance = null;
+    public $isMariaDB = false;
 
     static function Create(array $options = [],  ?ProfilerInterface $profiler = null): static
     {
@@ -72,9 +73,14 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
             self::$instance->query("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_0900_ai_ci'")->execute();
         }
 
+        //get table 
+        $version = self::$instance->query("SELECT VERSION() as version")->execute()->current()["version"];
+        self::$instance->isMariaDB = (stripos($version, 'MariaDB') !== false);
+
+
         return self::$instance;
     }
-    
+
     public function disconnect()
     {
         $this->getDriver()->getConnection()->disconnect();
@@ -90,6 +96,7 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
     {
         if ($this->tables) return $this->tables;
         $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this);
+
         $collect = collect();
 
         foreach ($meta->getTableNames() as $tableName) {

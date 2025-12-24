@@ -48,6 +48,29 @@ class Table extends TableGateway
     }
 
     /**
+     * 核心解析邏輯：兼容 MySQL 的直接值與 MariaDB 的引用值
+     */
+    protected function parseDefaultValue($value)
+    {
+        // 如果係真正的 NULL，直接回傳
+        if ($value === null) return null;
+
+        // 處理 MariaDB: 將字串 'NULL' 轉回 PHP null
+        if (strtoupper($value) === 'NULL') return null;
+
+        // 處理 MariaDB: 如果係字串 literal (例如被單引號包住 '\'abc\'')
+        if (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
+            $unquoted = substr($value, 1, -1);
+            // 還原 Escape 的引號
+            return str_replace("\\'", "'", $unquoted);
+        }
+
+        // 如果係數字 (例如 123) 或者 MySQL 嘅直接值，直接回傳
+        return $value;
+    }
+
+
+    /**
      * @return \Illuminate\Support\Collection<Column>
      */
     public function columns(): \Illuminate\Support\Collection
@@ -55,13 +78,14 @@ class Table extends TableGateway
         if ($this->_columns) return $this->_columns;
         $this->_columns = collect();
 
-        $p = $this->adapter->getPlatform();
-        if ($p->getName() == "MySQL") {
+        $platform = $this->adapter->getPlatform();
+
+        if ($platform->getName() == "MySQL" && $this->adapter instanceof \Light\Db\Adapter) {
             $schema = $this->adapter->getCurrentSchema();
 
             $sql = "SELECT * FROM `INFORMATION_SCHEMA`.`COLUMNS`  Where `TABLE_NAME`  = "
-                . $p->quoteTrustedValue($this->table)
-                . " AND `TABLE_SCHEMA` = " . $p->quoteTrustedValue($schema);
+                . $this->adapter->getPlatform()->quoteTrustedValue($this->table)
+                . " AND `TABLE_SCHEMA` = " . $this->adapter->getPlatform()->quoteTrustedValue($schema);
 
             $result = $this->adapter->query($sql)->execute();
 
@@ -70,25 +94,42 @@ class Table extends TableGateway
                 $column->setOrdinalPosition($row["ORDINAL_POSITION"]);
                 $column->setDataType($row["DATA_TYPE"]);
                 $column->setIsNullable($row["IS_NULLABLE"] === "YES");
-                if (
-                    $row["EXTRA"] == "auto_increment"
-                    || $row["EXTRA"] == "VIRTUAL GENERATED"
-                    || $row["EXTRA"] == "DEFAULT_GENERATED"
-                    || $row["EXTRA"] == "STORED GENERATED"
-                ) {
-                    $column->setColumnDefault(null);
-                } else {
-                    $column->setColumnDefault($row["COLUMN_DEFAULT"]);
-                }
 
+                $rawDefault = $row["COLUMN_DEFAULT"];
+                $extra = $row["EXTRA"];
+
+                $isExpression = ($rawDefault !== null && (
+                    strpos($rawDefault, '(') !== false ||
+                    strtoupper($rawDefault) === 'CURRENT_TIMESTAMP'
+                ));
+
+                if ($rawDefault === null || $isExpression) {
+                    $column->setColumnDefault(null);
+                } else if ($this->adapter->isMariaDB) {
+                    // --- 進入 MariaDB 專屬邏輯 ---
+                    if (strtoupper($rawDefault) === 'NULL') {
+                        $column->setColumnDefault(null);
+                    } else if (strlen($rawDefault) >= 2 && $rawDefault[0] === "'" && substr($rawDefault, -1) === "'") {
+                        // MariaDB 10.2.7+ 嘅 Literal 必然有引號包裹
+                        $unquoted = substr($rawDefault, 1, -1);
+                        $column->setColumnDefault(str_replace("\\'", "'", $unquoted));
+                    } else {
+                        // 冇引號嘅可能係數字
+                        $column->setColumnDefault($rawDefault);
+                    }
+                } else {
+                    // --- 進入標準 MySQL 邏輯 ---
+                    // MySQL 唔會幫你加多層引號，亦唔會將 NULL 變做字串 'NULL'
+                    $column->setColumnDefault($rawDefault);
+                }
 
                 $column->setCharacterMaximumLength($row["CHARACTER_MAXIMUM_LENGTH"]);
                 $column->setCharacterOctetLength($row["CHARACTER_OCTET_LENGTH"]);
                 $column->setNumericPrecision($row["NUMERIC_PRECISION"]);
                 $column->setNumericScale($row["NUMERIC_SCALE"]);
                 $column->setNumericUnsigned(false !== strpos($row['COLUMN_TYPE'], 'unsigned'));
-                $column->setVirtualGenerated($row["EXTRA"] === "VIRTUAL GENERATED");
-                $column->setAutoIncrement($row["EXTRA"] === "auto_increment");
+                $column->setVirtualGenerated(strpos($extra, "VIRTUAL") !== false);
+                $column->setAutoIncrement(strpos($extra, "auto_increment") !== false);
 
                 $this->_columns->push($column);
             }
