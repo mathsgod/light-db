@@ -52,21 +52,42 @@ class Table extends TableGateway
      */
     protected function parseDefaultValue($value)
     {
-        // 如果係真正的 NULL，直接回傳
-        if ($value === null) return null;
+        $columnDefault = null;
+        if ($this->adapter->isMariaDB) {
+            // --- MariaDB 精準邏輯 ---
+            // 1. 檢查是否為引號包住的「純文字」 (Literal)
+            if (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
+                $unquoted = substr($value, 1, -1);
+                $columnDefault = str_replace("\\'", "'", $unquoted);
+            }
+            // 2. 唔係引號包住，檢查係咪 'NULL' 字串
+            else if (strtoupper($value) === 'NULL') {
+                $columnDefault = null;
+            }
+            // 3. 唔係引號包住，又唔係 NULL，且有括號或關鍵字 -> 判定為 Expression
+            else if (strpos($value, '(') !== false || strtoupper($value) === 'CURRENT_TIMESTAMP') {
+                $columnDefault = null; // 你要求 Expression 出 null
+            }
+            // 4. 其他情況 (例如數字 123)
+            else {
+                $columnDefault = $value;
+            }
+        } else {
+            // --- MySQL 精準邏輯 ---
+            // MySQL 8.0 表達式會用括號包住，例如 (now())
+            // 但如果係字串 'now()'，MySQL 會直接畀 now() (冇括號)
+            $isMySQLExpression = (
+                (strlen($value) >= 2 && $value[0] === "(" && substr($value, -1) === ")") ||
+                strtoupper($value) === 'CURRENT_TIMESTAMP'
+            );
 
-        // 處理 MariaDB: 將字串 'NULL' 轉回 PHP null
-        if (strtoupper($value) === 'NULL') return null;
-
-        // 處理 MariaDB: 如果係字串 literal (例如被單引號包住 '\'abc\'')
-        if (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
-            $unquoted = substr($value, 1, -1);
-            // 還原 Escape 的引號
-            return str_replace("\\'", "'", $unquoted);
+            if ($isMySQLExpression) {
+                $columnDefault = null;
+            } else {
+                $columnDefault = $value;
+            }
         }
-
-        // 如果係數字 (例如 123) 或者 MySQL 嘅直接值，直接回傳
-        return $value;
+        return $columnDefault;
     }
 
 
@@ -97,31 +118,9 @@ class Table extends TableGateway
 
                 $rawDefault = $row["COLUMN_DEFAULT"];
                 $extra = $row["EXTRA"];
+                
 
-                $isExpression = ($rawDefault !== null && (
-                    strpos($rawDefault, '(') !== false ||
-                    strtoupper($rawDefault) === 'CURRENT_TIMESTAMP'
-                ));
-
-                if ($rawDefault === null || $isExpression) {
-                    $column->setColumnDefault(null);
-                } else if ($this->adapter->isMariaDB) {
-                    // --- 進入 MariaDB 專屬邏輯 ---
-                    if (strtoupper($rawDefault) === 'NULL') {
-                        $column->setColumnDefault(null);
-                    } else if (strlen($rawDefault) >= 2 && $rawDefault[0] === "'" && substr($rawDefault, -1) === "'") {
-                        // MariaDB 10.2.7+ 嘅 Literal 必然有引號包裹
-                        $unquoted = substr($rawDefault, 1, -1);
-                        $column->setColumnDefault(str_replace("\\'", "'", $unquoted));
-                    } else {
-                        // 冇引號嘅可能係數字
-                        $column->setColumnDefault($rawDefault);
-                    }
-                } else {
-                    // --- 進入標準 MySQL 邏輯 ---
-                    // MySQL 唔會幫你加多層引號，亦唔會將 NULL 變做字串 'NULL'
-                    $column->setColumnDefault($rawDefault);
-                }
+                $column->setColumnDefault($this->parseDefaultValue($rawDefault));
 
                 $column->setCharacterMaximumLength($row["CHARACTER_MAXIMUM_LENGTH"]);
                 $column->setCharacterOctetLength($row["CHARACTER_OCTET_LENGTH"]);
