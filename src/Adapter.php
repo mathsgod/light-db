@@ -69,12 +69,13 @@ class Adapter extends \Laminas\Db\Adapter\Adapter
             $profiler
         );
 
-        if ($charset == "utf8mb4") {
+        //get table 
+        $version = self::$instance->query("SELECT VERSION() as version")->execute()->current()["version"];
+
+        if ($charset == "utf8mb4" && str_starts_with($version, "8.")) {
             self::$instance->query("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_0900_ai_ci'")->execute();
         }
 
-        //get table 
-        $version = self::$instance->query("SELECT VERSION() as version")->execute()->current()["version"];
         self::$instance->isMariaDB = (stripos($version, 'MariaDB') !== false);
 
 
