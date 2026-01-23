@@ -162,7 +162,7 @@ abstract class Model extends RowGateway implements JsonSerializable
 
     public function save()
     {
-        $key = $this->getPrimaryKey();
+      $keys = self::_table()->getPrimaryKey();
         $table = self::_table();
 
 
@@ -214,11 +214,14 @@ abstract class Model extends RowGateway implements JsonSerializable
         }
 
 
-        $this->data[$key] = $this->original[$key];
+        foreach ($keys as $key) {
+            $this->data[$key] = $this->original[$key];
+        }
+
 
         foreach ($table->columns() as $column) {
             $colName = $column->getName();
-            if ($colName == $key) continue;
+            if (in_array($colName, $keys)) continue;
 
             if (!$column->isNullable()) {
                 if (array_key_exists($colName, $this->data)) {
@@ -243,7 +246,7 @@ abstract class Model extends RowGateway implements JsonSerializable
             }
         }
 
-
+        
         $this->changed = $this->data;
         $result = parent::save();
         $this->original = $this->data;
