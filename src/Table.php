@@ -73,6 +73,10 @@ class Table extends TableGateway
                 $columnDefault = $value;
             }
         } else {
+            if ($value === null) {
+                return null;
+            }
+
             // --- MySQL 精準邏輯 ---
             // MySQL 8.0 表達式會用括號包住，例如 (now())
             // 但如果係字串 'now()'，MySQL 會直接畀 now() (冇括號)
@@ -118,7 +122,7 @@ class Table extends TableGateway
 
                 $rawDefault = $row["COLUMN_DEFAULT"];
                 $extra = $row["EXTRA"];
-                
+
 
                 $column->setColumnDefault($this->parseDefaultValue($rawDefault));
 
