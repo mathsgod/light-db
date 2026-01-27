@@ -247,14 +247,14 @@ class Query extends Select implements IteratorAggregate
                     if (!$isFirst) {
                         $orPredicate = $orPredicate->or;
                     }
-                    
+
                     // 對於 OR 條件，我們需要為每個子條件創建一個嵌套的 predicate
                     if (is_array($orCondition) && count($orCondition) > 0) {
                         $subPredicate = $orPredicate->nest();
                         $this->processFilter($subPredicate, $orCondition);
                         $subPredicate->unnest();
                     }
-                    
+
                     $isFirst = false;
                 }
                 $orPredicate->unnest();
@@ -278,7 +278,11 @@ class Query extends Select implements IteratorAggregate
             }
 
             if (isset(self::$Filters[$this->class][$k])) {
-                $exp = self::$Filters[$this->class][$k]($v);
+                $predicate = new Predicate;
+                $exp = self::$Filters[$this->class][$k]($v, $predicate);
+                if (!$exp) {
+                    $exp = $predicate;
+                }
             } else {
                 $exp = $k;
             }
@@ -286,12 +290,14 @@ class Query extends Select implements IteratorAggregate
             // If the expression is a callable result (like a subquery string), use it as a literal expression
             if (isset(self::$Filters[$this->class][$k])) {
 
-                if($exp instanceof Predicate) {
+                if ($exp instanceof Predicate) {
                     $where->addPredicate($exp);
                     continue;
                 }
-                
-                $where->literal($exp);
+
+                if ($exp) {
+                    $where->literal($exp);
+                }
             } elseif (is_array($v)) {
                 // 使用 FilterHelper 處理複雜的過濾條件
                 $filterPredicate = FilterHelper::processFilterValue($exp, $v);
