@@ -55,6 +55,11 @@ class FilterHelper
         $logicalPredicate->unnest();
     }
 
+    private static function escapeLikeValue(string $value): string
+    {
+        return addcslashes($value, '%_\\');
+    }
+
     private static function applyOperator($where, $field, $operator, $value)
     {
         switch ($operator) {
@@ -63,16 +68,19 @@ class FilterHelper
                 $where->like($field, $value);
                 break;
             case '_contains':
-            case 'contains':                
-                $where->like($field, "%$value%");
+            case 'contains':
+                $escaped = self::escapeLikeValue($value);
+                $where->like($field, "%$escaped%");
                 break;
             case '_startsWith':
             case 'startsWith':
-                $where->like($field, "$value%");
+                $escaped = self::escapeLikeValue($value);
+                $where->like($field, "$escaped%");
                 break;
             case '_endsWith':
             case 'endsWith':
-                $where->like($field, "%$value");
+                $escaped = self::escapeLikeValue($value);
+                $where->like($field, "%$escaped");
                 break;
             case '_in':
             case 'in':
