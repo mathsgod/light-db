@@ -58,6 +58,10 @@ class FilterHelper
     private static function applyOperator($where, $field, $operator, $value)
     {
         switch ($operator) {
+            case '_like':
+            case 'like':
+                $where->like($field, $value);
+                break;
             case '_contains':
             case 'contains':                
                 $where->like($field, "%$value%");
