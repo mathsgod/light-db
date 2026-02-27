@@ -126,7 +126,7 @@ abstract class Model extends RowGateway implements JsonSerializable
                     $class = $name;
                 }
             }
-            if (!class_exists($class)) {
+            if (!class_exists($class) || !is_subclass_of($class, Model::class)) {
                 $v = null;
                 return $v;
             }
@@ -356,7 +356,7 @@ abstract class Model extends RowGateway implements JsonSerializable
             }
         }
 
-        if (!class_exists($class)) {
+        if (!class_exists($class) || !is_subclass_of($class, Model::class)) {
             throw new Exception($class . " class not found");
         }
 
