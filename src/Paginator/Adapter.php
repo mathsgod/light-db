@@ -17,9 +17,10 @@ class Adapter implements AdapterInterface
 
     function getItems($offset, $itemCountPerPage)
     {
-        $this->query->offset($offset);
-        $this->query->limit($itemCountPerPage);
-        return new ArrayObject($this->query->toArray());
+        $query = clone $this->query;
+        $query->offset($offset);
+        $query->limit($itemCountPerPage);
+        return new ArrayObject($query->toArray());
     }
 
     function count(): int
