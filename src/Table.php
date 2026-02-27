@@ -186,8 +186,18 @@ class Table extends TableGateway
 
         return iterator_to_array($this->selectWith($select))[0]["c"] ?? 0;
     }
+    private function validateColumnName(string $column): string
+    {
+        $valid = $this->columns()->first(fn($col) => $col->getName() === $column);
+        if (!$valid) {
+            throw new \InvalidArgumentException("Invalid column name: " . $column);
+        }
+        return $column;
+    }
+
     public function min(string $column, $where = null)
     {
+        $column = $this->validateColumnName($column);
         $select = new Select($this->table);
         if (isset($where)) {
             $select->where($where);
@@ -214,6 +224,7 @@ class Table extends TableGateway
 
     public function avg(string $column, $where = null)
     {
+        $column = $this->validateColumnName($column);
         $select = new Select($this->table);
         if (isset($where)) {
             $select->where($where);
@@ -227,6 +238,7 @@ class Table extends TableGateway
 
     public function sum(string $column, $where = null)
     {
+        $column = $this->validateColumnName($column);
         $select = new Select($this->table);
         if (isset($where)) {
             $select->where($where);
@@ -413,6 +425,7 @@ class Table extends TableGateway
 
     public function max($column, $where = null)
     {
+        $column = $this->validateColumnName($column);
         $select = new Select($this->table);
         if (isset($where)) {
             $select->where($where);
