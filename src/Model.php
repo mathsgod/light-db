@@ -139,7 +139,7 @@ abstract class Model extends RowGateway implements JsonSerializable
 
         if ($column->getDataType() == "json") {
             if (!array_key_exists($name, $this->data)) {
-                $this->data[$name] = json_decode($this->original[$name], true);
+                $this->data[$name] = $this->original[$name] !== null ? json_decode($this->original[$name], true) : null;
             }
             return $this->data[$name];
         }
