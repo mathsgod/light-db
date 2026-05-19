@@ -55,6 +55,9 @@ class Table extends TableGateway
         $columnDefault = null;
         if ($this->adapter->isMariaDB) {
             // --- MariaDB 精準邏輯 ---
+            if ($value === null) {
+                return null;
+            }
             // 1. 檢查是否為引號包住的「純文字」 (Literal)
             if (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
                 $unquoted = substr($value, 1, -1);
