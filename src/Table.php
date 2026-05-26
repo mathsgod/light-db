@@ -101,6 +101,15 @@ class Table extends TableGateway
     /**
      * @return \Illuminate\Support\Collection<Column>
      */
+    public function getColumns(): \Illuminate\Support\Collection
+    {
+        return $this->columns();
+    }
+
+
+    /**
+     * @return \Illuminate\Support\Collection<Column>
+     */
     public function columns(): \Illuminate\Support\Collection
     {
         if ($this->_columns) return $this->_columns;
