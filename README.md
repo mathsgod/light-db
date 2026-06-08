@@ -1,28 +1,33 @@
 [![GitHub](https://img.shields.io/github/license/mathsgod/light-db)](https://github.com/mathsgod/light-db)
-[![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://www.php.net/)
-[![Tests](https://img.shields.io/badge/tests-73%20passing-brightgreen.svg)](https://github.com/mathsgod/light-db)
+[![PHP](https://img.shields.io/badge/PHP-8.2%2B-blue.svg)](https://www.php.net/)
+[![CI](https://github.com/mathsgod/light-db/actions/workflows/tests.yml/badge.svg)](https://github.com/mathsgod/light-db/actions)
+[![Tests](https://img.shields.io/badge/tests-96%20passing-brightgreen.svg)](https://github.com/mathsgod/light-db)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)](https://www.mysql.com/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-10.11%20%7C%2011.4-blue.svg)](https://mariadb.org/)
 
 # Light-DB
 
-Light-DB is a lightweight PHP ORM/database access layer built on top of Laminas DB, designed for modern PHP 8.1+ applications. It provides an Eloquent-like Model operation experience with support for auto-mapping, dynamic queries, relationship queries, JSON field operations, and pagination features.
+Light-DB is a lightweight PHP ORM/database access layer built on top of Laminas DB, designed for modern PHP 8.2+ applications. It provides an Eloquent-like Active Record experience with support for auto-mapping, dynamic queries, relationship queries, JSON field operations, and pagination — with first-class compatibility for both **MySQL 8.0** and **MariaDB 10.11 / 11.4**.
 
 ## ✨ Features
 
-- 🚀 **Modern PHP**: Built on PHP 8.1+ features with type declarations and modern PHP syntax
-- 🔗 **Multi-Database Support**: Based on Laminas DB, supports MySQL, PostgreSQL, SQLite, SQL Server and more
-- 📦 **Eloquent-Style**: Familiar Active Record pattern with Eloquent-like API
-- 🎯 **Smart Queries**: Support for complex conditional queries, sorting, grouping, and aggregation functions
-- 📄 **Pagination Support**: Built-in Laminas Paginator integration for easy pagination
-- 🔄 **JSON Fields**: Native support for JSON field operations with automatic serialization/deserialization
-- 🔗 **Relationship Queries**: Support for inter-model relationship queries and dynamic property access
-- 🧪 **Comprehensive Testing**: 73+ test cases ensuring code quality and stability
-- ⚡ **High Performance**: Lazy loading and query optimization for excellent performance
+- 🚀 **Modern PHP**: Built on PHP 8.2+ features with type declarations and modern PHP syntax
+- 🔗 **Multi-Database Support**: Based on Laminas DB — supports MySQL 8.0, MariaDB 10.11/11.4, PostgreSQL, SQLite, SQL Server
+- 🧩 **MariaDB-Aware**: Detects MariaDB at runtime and adjusts column metadata (JSON detection, default-value parsing) automatically
+- 📦 **Eloquent-Style**: Familiar Active Record pattern with an Eloquent-like API powered by `illuminate/collections`
+- 🎯 **Smart Queries**: Complex conditional queries, sorting, grouping, and aggregation functions
+- 📄 **Pagination Support**: Built-in Laminas Paginator integration
+- 🔄 **JSON Fields**: Native JSON field operations with automatic serialization/deserialization
+- 🔗 **Relationship Queries**: Inter-model relationship queries and dynamic property access
+- ✅ **CI-Tested**: Automated test matrix on GitHub Actions across PHP 8.2 / 8.3 / 8.4 / 8.5 × MySQL 8.0 / MariaDB 10.11 / MariaDB 11.4
 
 ## 📋 Requirements
 
-- PHP 8.1 or higher
+- PHP 8.2 or higher
 - PDO extension
-- Supported databases: MySQL, PostgreSQL, SQLite, SQL Server, etc.
+- A supported database (tested against):
+  - MySQL 8.0
+  - MariaDB 10.11 / 11.4
 
 ## 🚀 Installation
 
@@ -37,7 +42,7 @@ composer require mathsgod/light-db
 Create a `.env` file in your project root:
 
 ```env
-DATABASE_DRIVER=pdo_mysql
+DATABASE_DRIVER=Pdo_Mysql
 DATABASE_HOSTNAME=localhost
 DATABASE_PORT=3306
 DATABASE_DATABASE=your_database
@@ -216,6 +221,8 @@ $user->profile['tags'][] = 'javascript';
 $user->save();
 ```
 
+> **Note**: MariaDB stores JSON columns as `LONGTEXT` with a `JSON_VALID()` CHECK constraint. Light-DB detects this at runtime and treats them as `json` data type for transparent encoding/decoding.
+
 ### 🔗 Relationship Queries
 
 ```php
@@ -264,9 +271,23 @@ User::RegisterOrder('popular', function($query) {
 $popularUsers = User::Query()->sort('popular')->toArray();
 ```
 
-## 📊 Available Test Groups
+## 🗄️ Database Compatibility
 
-This project includes a comprehensive test suite. You can run specific test groups:
+| Database | Version | Status |
+|---|---|---|
+| MySQL    | 8.0     | ✅ Fully supported |
+| MariaDB  | 10.11   | ✅ Fully supported |
+| MariaDB  | 11.4    | ✅ Fully supported |
+
+Light-DB automatically detects MariaDB at connection time by inspecting `SELECT VERSION()`. Internally, this enables:
+
+- **JSON column detection** — MariaDB reports `json` columns as `longtext` in `INFORMATION_SCHEMA`; Light-DB queries `CHECK_CONSTRAINTS` for `json_valid()` clauses to recover the real type
+- **Default-value parsing** — MariaDB quotes string defaults (e.g. `'foo'`) while MySQL 8.0 does not; Light-DB normalizes both formats
+- **Connection setup** — `utf8mb4_0900_ai_ci` collation is only set on MySQL 8.x
+
+## 🧪 Running Tests
+
+A `.env` file with valid database credentials is required (see [Configuration](#️-configuration)).
 
 ```bash
 # Run all tests
@@ -281,20 +302,38 @@ composer test-crud
 # Run JSON field tests
 composer test-json
 
-# Run unit tests
+# Run unit tests only
 composer test-unit
 
-# Run integration tests
+# Run integration tests only
 composer test-integration
 ```
 
-## 🧪 Test Coverage
+## ✅ Continuous Integration
 
-- **73+** test cases
-- **269+** assertions
+Tests run automatically on every push and pull request via [GitHub Actions](https://github.com/mathsgod/light-db/actions). The CI matrix covers:
+
+- **PHP**: 8.2, 8.3, 8.4, 8.5
+- **Database**: MySQL 8.0, MariaDB 10.11, MariaDB 11.4
+
+That gives **12 parallel jobs** ensuring compatibility across the supported matrix.
+
+## 📊 Test Coverage
+
+- **96** test cases
+- **380** assertions
 - Covers all core functionality
 - Includes unit and integration tests
 - Supports error handling and edge case testing
+
+## 📦 Dependencies
+
+| Package | Version | Purpose |
+|---|---|---|
+| `laminas/laminas-db` | `^2.20` | Database abstraction layer |
+| `laminas/laminas-paginator` | `^2.20` | Pagination support |
+| `illuminate/collections` | `^11.0 \|\| ^12.0` | Eloquent-style collections |
+| `vlucas/phpdotenv` | `^5.6` | Environment variable loading |
 
 ## 📝 License
 
