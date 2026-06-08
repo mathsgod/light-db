@@ -22,4 +22,18 @@ final class ColumnTest extends BaseTestCase
 
         $this->assertEquals($org_name->getName(), "name");
     }
+
+    public function testJsonColumnDataType()
+    {
+        $db = Adapter::Create();
+        $table = $db->getTable("Testing");
+        $j = $table->column("j");
+
+        $this->assertNotNull($j, "Column 'j' should exist");
+        $this->assertEquals(
+            "json",
+            $j->getDataType(),
+            "Column 'j' should be detected as json type (works on both MySQL 8.0 and MariaDB)"
+        );
+    }
 }

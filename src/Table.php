@@ -148,6 +148,17 @@ class Table extends TableGateway
 
                 $this->_columns->push($column);
             }
+
+            // MariaDB stores JSON as LONGTEXT with a JSON_VALID CHECK constraint.
+            // Detect those columns and mark them as 'json' data type so Model::save() encodes them.
+            if ($this->adapter->isMariaDB) {
+                $jsonCols = $this->getMariaDbJsonColumns($schema);
+                foreach ($this->_columns as $column) {
+                    if (in_array($column->getName(), $jsonCols, true)) {
+                        $column->setDataType('json');
+                    }
+                }
+            }
         } else {
             $meta = \Laminas\Db\Metadata\Source\Factory::createSourceFromAdapter($this->adapter);
             foreach ($meta->getColumns($this->table) as $column) {
@@ -161,6 +172,36 @@ class Table extends TableGateway
     public function column(string $name): ?Column
     {
         return $this->columns()->first(fn($column) => $column->getName() === $name);
+    }
+
+    /**
+     * Detect JSON columns on MariaDB by querying CHECK_CONSTRAINTS for json_valid() clauses.
+     * Returns an array of column names that are JSON columns.
+     */
+    protected function getMariaDbJsonColumns(string $schema): array
+    {
+        $sql = "SELECT cc.CONSTRAINT_NAME
+                FROM `INFORMATION_SCHEMA`.`CHECK_CONSTRAINTS` cc
+                JOIN `INFORMATION_SCHEMA`.`TABLE_CONSTRAINTS` tc
+                  ON tc.CONSTRAINT_SCHEMA = cc.CONSTRAINT_SCHEMA
+                 AND tc.TABLE_NAME = cc.TABLE_NAME
+                 AND tc.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
+                WHERE cc.CONSTRAINT_SCHEMA = "
+                    . $this->adapter->getPlatform()->quoteTrustedValue($schema)
+                . " AND cc.TABLE_NAME = "
+                    . $this->adapter->getPlatform()->quoteTrustedValue($this->table)
+                . " AND tc.CONSTRAINT_TYPE = 'CHECK'
+                  AND cc.CHECK_CLAUSE LIKE 'json_valid(%'";
+
+        $result = $this->adapter->query($sql)->execute();
+        $cols = [];
+        foreach ($result as $row) {
+            $name = $row['CONSTRAINT_NAME'] ?? null;
+            if ($name !== null) {
+                $cols[] = $name;
+            }
+        }
+        return $cols;
     }
 
     public function removeColumn(string $name)

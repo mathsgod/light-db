@@ -182,13 +182,19 @@ abstract class Model extends RowGateway implements JsonSerializable
             }
 
             if ($column->getDataType() == "json") {
+                $encoded = json_encode($value, JSON_UNESCAPED_UNICODE);
+                if ($encoded === false) {
+                    throw new \InvalidArgumentException(
+                        "Failed to encode value for JSON column '{$name}': " . json_last_error_msg()
+                    );
+                }
                 //compare to original data ,if not changed, skip
-                if ($this->original[$name] == json_encode($value, JSON_UNESCAPED_UNICODE)) {
+                if ($this->original[$name] == $encoded) {
                     unset($this->data[$name]);
                     continue;
                 }
 
-                $this->data[$name] = json_encode($value, JSON_UNESCAPED_UNICODE);
+                $this->data[$name] = $encoded;
                 continue;
             }
 

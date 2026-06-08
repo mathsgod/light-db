@@ -9,18 +9,65 @@ on:
 
 jobs:
   test:
-    name: PHP ${{ matrix.php }} / MySQL ${{ matrix.mysql }}
+    name: PHP ${{ matrix.php }} / ${{ matrix.db_engine }} ${{ matrix.db_version }}
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.3', '8.4', '8.5']
-        mysql: ['8.0']
+        include:
+          - php: '8.2'
+            db_engine: MySQL
+            db_version: '8.0'
+            db_image: mysql:8.0
+          - php: '8.2'
+            db_engine: MariaDB
+            db_version: '10.11'
+            db_image: mariadb:10.11
+          - php: '8.2'
+            db_engine: MariaDB
+            db_version: '11.4'
+            db_image: mariadb:11.4
+          - php: '8.3'
+            db_engine: MySQL
+            db_version: '8.0'
+            db_image: mysql:8.0
+          - php: '8.3'
+            db_engine: MariaDB
+            db_version: '10.11'
+            db_image: mariadb:10.11
+          - php: '8.3'
+            db_engine: MariaDB
+            db_version: '11.4'
+            db_image: mariadb:11.4
+          - php: '8.4'
+            db_engine: MySQL
+            db_version: '8.0'
+            db_image: mysql:8.0
+          - php: '8.4'
+            db_engine: MariaDB
+            db_version: '10.11'
+            db_image: mariadb:10.11
+          - php: '8.4'
+            db_engine: MariaDB
+            db_version: '11.4'
+            db_image: mariadb:11.4
+          - php: '8.5'
+            db_engine: MySQL
+            db_version: '8.0'
+            db_image: mysql:8.0
+          - php: '8.5'
+            db_engine: MariaDB
+            db_version: '10.11'
+            db_image: mariadb:10.11
+          - php: '8.5'
+            db_engine: MariaDB
+            db_version: '11.4'
+            db_image: mariadb:11.4
 
     services:
-      mysql:
-        image: mysql:${{ matrix.mysql }}
+      db:
+        image: ${{ matrix.db_image }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: test_db
@@ -51,8 +98,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache/files
-          key: ${{ runner.os }}-php-${{ matrix.php }}-${{ hashFiles('composer.json') }}
-          restore-keys: ${{ runner.os }}-php-${{ matrix.php }}-
+          key: ${{ runner.os }}-php-${{ matrix.php }}-${{ matrix.db_image }}-${{ hashFiles('composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-php-${{ matrix.php }}-${{ matrix.db_image }}-
+            ${{ runner.os }}-php-${{ matrix.php }}-
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
@@ -69,17 +118,17 @@ jobs:
           DATABASE_CHARSET=utf8mb4
           EOF
 
-      - name: Wait for MySQL
+      - name: Wait for ${{ matrix.db_engine }}
         run: |
           for i in {1..30}; do
             if php -r 'new PDO("mysql:host=127.0.0.1;port=3306", "root", "root");' 2>/dev/null; then
-              echo "MySQL is ready"
+              echo "${{ matrix.db_engine }} is ready"
               exit 0
             fi
-            echo "Waiting for MySQL..."
+            echo "Waiting for ${{ matrix.db_engine }}..."
             sleep 2
           done
-          echo "MySQL did not become ready in time"
+          echo "${{ matrix.db_engine }} did not become ready in time"
           exit 1
 
       - name: Run PHPUnit
