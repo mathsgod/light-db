@@ -105,6 +105,85 @@ CREATE TABLE `Testing3` (
 $adapter->query($createTesting3Sql, Adapter::QUERY_MODE_EXECUTE);
 echo "Testing3 table created successfully!\n";
 
+// Drop and create User table (for relationship tests)
+echo "Setting up User table...\n";
+
+$adapter->query("DROP TABLE IF EXISTS `User`", Adapter::QUERY_MODE_EXECUTE);
+
+$createUserSql = "
+CREATE TABLE `User` (
+    `user_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+    `name` varchar(100) DEFAULT NULL,
+    `email` varchar(255) DEFAULT NULL,
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`user_id`),
+    KEY `idx_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User table for relationship tests';
+";
+
+$adapter->query($createUserSql, Adapter::QUERY_MODE_EXECUTE);
+echo "User table created successfully!\n";
+
+// Drop and create UserList table
+echo "Setting up UserList table...\n";
+
+$adapter->query("DROP TABLE IF EXISTS `UserList`", Adapter::QUERY_MODE_EXECUTE);
+
+$createUserListSql = "
+CREATE TABLE `UserList` (
+    `userlist_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+    `user_id` int(10) unsigned DEFAULT NULL,
+    `name` varchar(100) DEFAULT NULL,
+    `status` enum('active','inactive','pending') DEFAULT 'active',
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`userlist_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='UserList table for relationship tests';
+";
+
+$adapter->query($createUserListSql, Adapter::QUERY_MODE_EXECUTE);
+echo "UserList table created successfully!\n";
+
+// Drop and create UserGroup table
+echo "Setting up UserGroup table...\n";
+
+$adapter->query("DROP TABLE IF EXISTS `UserGroup`", Adapter::QUERY_MODE_EXECUTE);
+
+$createUserGroupSql = "
+CREATE TABLE `UserGroup` (
+    `usergroup_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+    `user_id` int(10) unsigned DEFAULT NULL,
+    `name` varchar(100) DEFAULT NULL,
+    `priority` int(11) DEFAULT 1,
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`usergroup_id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='UserGroup table for relationship tests';
+";
+
+$adapter->query($createUserGroupSql, Adapter::QUERY_MODE_EXECUTE);
+echo "UserGroup table created successfully!\n";
+
+// Drop and create UserLog table
+echo "Setting up UserLog table...\n";
+
+$adapter->query("DROP TABLE IF EXISTS `UserLog`", Adapter::QUERY_MODE_EXECUTE);
+
+$createUserLogSql = "
+CREATE TABLE `UserLog` (
+    `userlog_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+    `user_id` int(10) unsigned DEFAULT NULL,
+    `action` varchar(100) DEFAULT NULL,
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`userlog_id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='UserLog table for relationship tests';
+";
+
+$adapter->query($createUserLogSql, Adapter::QUERY_MODE_EXECUTE);
+echo "UserLog table created successfully!\n";
+
 // Insert some basic test data
 echo "Inserting basic test data...\n";
 
@@ -118,10 +197,18 @@ foreach ($testData as $data) {
     $columns = array_keys($data);
     $values = array_values($data);
     $placeholders = str_repeat('?,', count($values) - 1) . '?';
-    
+
     $sql = "INSERT INTO Testing (" . implode(',', $columns) . ") VALUES ($placeholders)";
     $adapter->query($sql, $values);
 }
 
 echo "Test data inserted successfully!\n";
+
+// Insert User data (for relationship tests)
+$adapter->query("INSERT INTO `User` (`user_id`, `name`, `email`) VALUES (1, 'Raymond Chong', 'raymond@example.com')", Adapter::QUERY_MODE_EXECUTE);
+$adapter->query("INSERT INTO `UserList` (`user_id`, `name`, `status`) VALUES (1, 'List A', 'active'), (1, 'List B', 'inactive')", Adapter::QUERY_MODE_EXECUTE);
+$adapter->query("INSERT INTO `UserGroup` (`user_id`, `name`, `priority`) VALUES (1, 'Admin', 1)", Adapter::QUERY_MODE_EXECUTE);
+$adapter->query("INSERT INTO `UserLog` (`user_id`, `action`) VALUES (1, 'login')", Adapter::QUERY_MODE_EXECUTE);
+
+echo "Relationship test data inserted successfully!\n";
 echo "Database setup completed!\n";
