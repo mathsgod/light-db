@@ -423,4 +423,44 @@ final class QueryTest extends BaseTestCase
         $duration = microtime(true) - $start;
         $this->assertLessThan(2.0, $duration, 'Queries should complete in reasonable time');
     }
+
+    /**
+     * @group query_input_parameters
+     */
+    public function testCursorWithEmptyInputParameters(): void
+    {
+        // Empty array should be a no-op and not break the existing flow
+        $cursor = Testing::Query(['name' => 'test_user_1'])->cursor([]);
+        $rows = iterator_to_array($cursor);
+        $this->assertIsArray($rows);
+    }
+
+    /**
+     * @group query_input_parameters
+     */
+    public function testExecuteWithEmptyInputParameters(): void
+    {
+        $results = Testing::Query(['name' => 'test_user_1'])->execute([])->toArray();
+        $this->assertIsArray($results);
+    }
+
+    /**
+     * @group query_input_parameters
+     */
+    public function testCursorAndExecuteSignaturesAcceptInputParameters(): void
+    {
+        // Just ensure the methods accept the parameter without TypeError
+        $reflection = new \ReflectionClass(Query::class);
+        $cursor = $reflection->getMethod('cursor');
+        $execute = $reflection->getMethod('execute');
+
+        $this->assertTrue($cursor->isPublic());
+        $this->assertTrue($execute->isPublic());
+
+        $cursorParams = $cursor->getParameters();
+        $executeParams = $execute->getParameters();
+
+        $this->assertGreaterThanOrEqual(1, count($cursorParams), 'cursor() should accept input_parameters');
+        $this->assertGreaterThanOrEqual(1, count($executeParams), 'execute() should accept input_parameters');
+    }
 }
