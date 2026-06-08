@@ -7,6 +7,7 @@ use Exception;
 use Illuminate\Support\LazyCollection;
 use IteratorAggregate;
 use Laminas\Db\Adapter\AdapterInterface;
+use Laminas\Db\Adapter\ParameterContainer;
 use Laminas\Db\Adapter\Platform\PlatformInterface;
 use Laminas\Db\Sql\Expression;
 use Laminas\Db\Sql\Predicate\Predicate;
@@ -26,10 +27,10 @@ use ReflectionClass;
  */
 class Query extends Select implements IteratorAggregate
 {
-    private $class;
-    private $_table;
-    private $adapter;
-    private $_custom_column = false;
+    private readonly string $class;
+    private readonly ?Table $_table;
+    private readonly ?\Laminas\Db\Adapter\Adapter $adapter;
+    private bool $_custom_column = false;
 
     /**
      * @param class-string<T> $class
@@ -85,11 +86,27 @@ class Query extends Select implements IteratorAggregate
         return $table;
     }
 
-    public function cursor()
+    public function cursor(array $input_parameters = [])
     {
-        return new LazyCollection(function () {
+        return new LazyCollection(function () use ($input_parameters) {
             $table = $this->getExecuteTable();
-            foreach ($table->selectWith($this) as $row) {
+            $sql = $table->getSql();
+            $statement = $sql->prepareStatementForSqlObject($this);
+
+            if (!empty($input_parameters)) {
+                $parameterContainer = $statement->getParameterContainer();
+                if ($parameterContainer instanceof ParameterContainer) {
+                    foreach ($input_parameters as $name => $value) {
+                        $parameterContainer->offsetSet($name, $value);
+                    }
+                }
+            }
+
+            $result = $statement->execute();
+            $resultSet = clone $table->getResultSetPrototype();
+            $resultSet->initialize($result);
+
+            foreach ($resultSet as $row) {
                 yield $row;
             }
         });

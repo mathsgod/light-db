@@ -18,8 +18,8 @@ use Laminas\Db\Sql\Predicate;
 
 class Table extends TableGateway
 {
-    protected $_columns = null;
-    protected $_constraints = null;
+    protected ?\Illuminate\Support\Collection $_columns = null;
+    protected ?\Illuminate\Support\Collection $_constraints = null;
 
     /**
      * @return \Illuminate\Support\Collection<\Laminas\Db\Metadata\Object\ConstraintObject>
