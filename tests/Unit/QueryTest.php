@@ -463,4 +463,146 @@ final class QueryTest extends BaseTestCase
         $this->assertGreaterThanOrEqual(1, count($cursorParams), 'cursor() should accept input_parameters');
         $this->assertGreaterThanOrEqual(1, count($executeParams), 'execute() should accept input_parameters');
     }
+
+    /**
+     * @group query_or_and
+     */
+    public function testFiltersWithOrSimple(): void
+    {
+        // WHERE (age >= 30 OR name = 'Peter')
+        // Should match: Test User 2 (age 30). Test User 1 (25) and Test User 3 (28) do not match.
+        // No user named 'Peter', so only Test User 2 should be returned.
+        $results = Testing::Query()->filters([
+            '_or' => [
+                ['age' => ['gte' => 30]],
+                ['name' => 'Peter']
+            ]
+        ])->toArray();
+
+        $this->assertCount(1, $results);
+        $this->assertEquals('Test User 2', $results[0]->name);
+    }
+
+    /**
+     * @group query_or_and
+     */
+    public function testFiltersWithOrMultipleMatches(): void
+    {
+        // WHERE (status = 'active' OR status = 'inactive')
+        // Should match all 3 test users
+        $results = Testing::Query()->filters([
+            '_or' => [
+                ['status' => 'active'],
+                ['status' => 'inactive']
+            ]
+        ])->toArray();
+
+        $this->assertCount(3, $results);
+    }
+
+    /**
+     * @group query_or_and
+     */
+    public function testFiltersWithAndExplicit(): void
+    {
+        // WHERE (status = 'active' AND age >= 30)
+        // Should match only Test User 2 (status active, age 30)
+        $results = Testing::Query()->filters([
+            '_and' => [
+                ['status' => 'active'],
+                ['age' => ['gte' => 30]]
+            ]
+        ])->toArray();
+
+        $this->assertCount(1, $results);
+        $this->assertEquals('Test User 2', $results[0]->name);
+    }
+
+    /**
+     * @group query_or_and
+     */
+    public function testFiltersMixedOrAndAnd(): void
+    {
+        // WHERE status = 'active' AND (age >= 30 OR name = 'Test User 1')
+        // Should match: Test User 1 (active, name match) and Test User 2 (active, age match)
+        $results = Testing::Query()
+            ->where(['status' => 'active'])
+            ->filters([
+                '_or' => [
+                    ['age' => ['gte' => 30]],
+                    ['name' => 'Test User 1']
+                ]
+            ])
+            ->toArray();
+
+        $this->assertCount(2, $results);
+        $names = array_map(fn($r) => $r->name, $results);
+        sort($names);
+        $this->assertEquals(['Test User 1', 'Test User 2'], $names);
+    }
+
+    /**
+     * @group query_or_and
+     */
+    public function testFiltersNestedOrAnd(): void
+    {
+        // WHERE (age > 28 AND status = 'active') OR (name = 'Test User 3' AND status = 'inactive')
+        // Should match: Test User 2 (age 30, active) and Test User 3 (name match, inactive)
+        $results = Testing::Query()->filters([
+            '_or' => [
+                [
+                    '_and' => [
+                        ['age' => ['gt' => 28]],
+                        ['status' => 'active']
+                    ]
+                ],
+                [
+                    '_and' => [
+                        ['name' => 'Test User 3'],
+                        ['status' => 'inactive']
+                    ]
+                ]
+            ]
+        ])->toArray();
+
+        $this->assertCount(2, $results);
+        $names = array_map(fn($r) => $r->name, $results);
+        sort($names);
+        $this->assertEquals(['Test User 2', 'Test User 3'], $names);
+    }
+
+    /**
+     * @group query_or_and
+     */
+    public function testFiltersOrMatchesNothing(): void
+    {
+        // WHERE (age > 100 OR name = 'NoSuchUser')
+        // Should match nothing
+        $count = Testing::Query()->filters([
+            '_or' => [
+                ['age' => ['gt' => 100]],
+                ['name' => 'NoSuchUser']
+            ]
+        ])->count();
+
+        $this->assertEquals(0, $count);
+    }
+
+    /**
+     * @group query_or_and
+     */
+    public function testLaminasWhereWithOrCombination(): void
+    {
+        // Verify the direct Laminas-style where() with OP_OR also works
+        $results = Testing::Query()
+            ->where(['age >= ?' => 30], \Laminas\Db\Sql\Predicate\PredicateSet::OP_OR)
+            ->where(['name = ?' => 'Test User 1'], \Laminas\Db\Sql\Predicate\PredicateSet::OP_OR)
+            ->toArray();
+
+        // Test User 1 (age 25, name match) and Test User 2 (age 30)
+        $this->assertCount(2, $results);
+        $names = array_map(fn($r) => $r->name, $results);
+        sort($names);
+        $this->assertEquals(['Test User 1', 'Test User 2'], $names);
+    }
 }
