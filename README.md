@@ -168,6 +168,76 @@ $users = User::Query()
     ->toArray();
 ```
 
+#### OR / AND Logic with `filters()`
+
+Use the `_or` and `_and` magic keys inside `filters()` to build boolean logic.
+
+```php
+use Light\Db\Model;
+
+class User extends Model {}
+
+// WHERE (age >= 18 OR name = 'Peter')
+$users = User::Query()->filters([
+    '_or' => [
+        ['age' => ['gte' => 18]],
+        ['name' => 'Peter']
+    ]
+])->toArray();
+```
+
+Mixing outer `where()` with inner `_or` / `_and`:
+
+```php
+// WHERE status = 'active' AND (age >= 30 OR name = 'Test User 1')
+$users = User::Query()
+    ->where(['status' => 'active'])
+    ->filters([
+        '_or' => [
+            ['age' => ['gte' => 30]],
+            ['name' => 'Test User 1']
+        ]
+    ])
+    ->toArray();
+```
+
+Nested `_or` and `_and` for deeper boolean trees:
+
+```php
+// WHERE (age > 28 AND status = 'active')
+//    OR (name = 'Test User 3' AND status = 'inactive')
+$users = User::Query()->filters([
+    '_or' => [
+        [
+            '_and' => [
+                ['age' => ['gt' => 28]],
+                ['status' => 'active']
+            ]
+        ],
+        [
+            '_and' => [
+                ['name' => 'Test User 3'],
+                ['status' => 'inactive']
+            ]
+        ]
+    ]
+])->toArray();
+```
+
+Alternatively, the underlying `Laminas\Db\Sql\Select::where()` accepts a combination operator:
+
+```php
+use Laminas\Db\Sql\Predicate\PredicateSet;
+
+// WHERE (age >= 30 OR name = 'Test User 1')
+$users = User::Query()
+    ->where(['age >= ?' => 30], PredicateSet::OP_OR)
+    ->where(['name = ?' => 'Test User 1'], PredicateSet::OP_OR)
+    ->toArray();
+```
+
+> **Tip**: `filters(['_or' => ...])` is generally easier to read and supports arbitrary nesting. Use the direct `where(..., OP_OR)` form when you need fine-grained control over a single predicate.
+
 #### Aggregate Functions
 
 ```php
