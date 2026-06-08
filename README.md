@@ -271,6 +271,33 @@ User::RegisterOrder('popular', function($query) {
 $popularUsers = User::Query()->sort('popular')->toArray();
 ```
 
+#### Binding Input Parameters to Prepared Statements
+
+Both `cursor()` and `execute()` accept an optional `array $input_parameters = []` argument. These parameters are bound to the underlying `Laminas\Db\Adapter\ParameterContainer` and matched against the `?` placeholders that Light-DB/Laminas auto-generates for where conditions. Both methods iterate the same way and return hydrated model instances.
+
+```php
+// cursor() returns a Laravel LazyCollection — perfect for streaming large result sets
+foreach (User::Query()->cursor() as $user) {
+    echo $user->name;
+}
+
+// execute() returns a regular Collection eagerly materialized
+$users = User::Query()->execute()->toArray();
+```
+
+`input_parameters` is a thin pass-through to the prepared statement. Use it when you want to be explicit about what gets bound:
+
+```php
+// The framework already binds values from where() conditions automatically,
+// so this is normally a no-op. It exists for symmetry and advanced cases
+// (e.g. when the Select contains Expression objects with named placeholders).
+User::Query(['status' => 'active'])->execute([
+    'minAge' => 18,
+])->toArray();
+```
+
+> **Note**: If you pass keys that don't match any `?` token in the query, the database driver will reject the statement with `HY093` (PDO: "number of bound variables does not match number of tokens"). The placeholder count is determined by your where/filter/join expressions — Light-DB does not invent extra `?` tokens for unused parameters.
+
 ## 🗄️ Database Compatibility
 
 | Database | Version | Status |
