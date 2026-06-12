@@ -37,6 +37,9 @@ class Query extends Select implements IteratorAggregate
      */
     public function __construct(string $class, Table $table)
     {
+        if (is_subclass_of($class, Model::class)) {
+            $class::boot();
+        }
         $this->class = $class;
         parent::__construct($table->getTable());
         $this->adapter = $table->getAdapter();

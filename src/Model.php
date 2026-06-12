@@ -27,6 +27,60 @@ abstract class Model extends RowGateway implements JsonSerializable
         Query::RegisterOrder(get_called_class(), $name, $callback);
     }
 
+    /**
+     * Boots the model once per process per class. Registers any filters /
+     * sorts declared via filterDefinitions() / orderDefinitions() into
+     * the Query registry. Subclasses do not need to call this directly —
+     * Query::__construct invokes it.
+     */
+    public static function boot(): void
+    {
+        $class = static::class;
+        if (isset(self::$booted[$class])) {
+            return;
+        }
+        self::$booted[$class] = true;
+
+        foreach (static::filterDefinitions() as $name => $callback) {
+            Query::RegisterFilter($class, $name, $callback);
+        }
+        foreach (static::orderDefinitions() as $name => $callback) {
+            Query::RegisterOrder($class, $name, $callback);
+        }
+    }
+
+    /**
+     * Returns filter callbacks declared by this model. Keys are filter
+     * names (as passed in ->filters([$name => $value])), values are
+     * callables compatible with Query::$Filters. Override in subclasses
+     * to declare relation-based or computed filters. Use parent:: to
+     * inherit the parent's definitions, e.g.:
+     *
+     *   return array_merge(parent::filterDefinitions(), [
+     *       'foo' => fn($v) => '...',
+     *   ]);
+     *
+     * To borrow another class's filter, call Other::filterDefinitions()['name'].
+     */
+    protected static function filterDefinitions(): array
+    {
+        return [];
+    }
+
+    /**
+     * Returns order callbacks declared by this model. Same contract as
+     * filterDefinitions() but for ->order([$name => $direction]).
+     */
+    protected static function orderDefinitions(): array
+    {
+        return [];
+    }
+
+    /**
+     * @var array<class-string, true>
+     */
+    private static array $booted = [];
+
     static function Create(?array $data = []): static
     {
 
