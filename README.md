@@ -311,6 +311,59 @@ $activeLists = $user->UserList
 
 ### 🛠️ Advanced Features
 
+#### Declarative Filters & Sorts (`Model::boot()`)
+
+A model's relation-based or computed filters and sorts can be **declared on the model itself** instead of being registered ad-hoc from controllers. Light-DB auto-invokes the model's `boot()` lifecycle method the first time `Model::Query()` is called for the class, so registrations are guaranteed to be in place before any filter is resolved.
+
+Override `filterDefinitions()` and / or `orderDefinitions()` to return an `[name => callable]` map:
+
+```php
+use Light\Db\Model;
+
+class Schedule extends Model
+{
+    protected static function filterDefinitions(): array
+    {
+        return [
+            'Letter' => function ($value) {
+                return "letter_id IN (SELECT letter_id FROM letter WHERE subject = " . $value . ")";
+            },
+        ];
+    }
+
+    protected static function orderDefinitions(): array
+    {
+        return [
+            'recent' => fn($dir) => "created_at $dir",
+        ];
+    }
+}
+```
+
+After this, **any** caller of `Schedule::Query()->filters(['Letter' => $v])` — including sub-queries from unrelated code paths — gets the right SQL, without the controller having to call `RegisterFilter()` first. Boot is idempotent per process per class, so multiple `Query::Query()` invocations don't double-register.
+
+Inheritance via `parent::`:
+
+```php
+class Letter extends Schedule
+{
+    protected static function filterDefinitions(): array
+    {
+        return array_merge(parent::filterDefinitions(), [
+            'Tag' => fn($v) => "letter_id IN (SELECT letter_id FROM letter_tag WHERE tag = $v)",
+        ]);
+    }
+}
+```
+
+Borrow a filter from another class:
+
+```php
+'Schedule' => Schedule::filterDefinitions()['Letter'],
+```
+
+> The legacy `Model::RegisterFilter()` / `Model::RegisterOrder()` APIs are still supported and remain the right choice when the registration depends on request-scoped state (current user, request params, etc.) that the static `filterDefinitions()` hook cannot see. Both styles can coexist on the same model.
+
 #### Collection Operations
 
 ```php
@@ -332,7 +385,7 @@ $emailList = User::Query()
 #### Custom Sorting
 
 ```php
-// Register custom sorting logic
+// Legacy: register a sort ad-hoc from anywhere (still supported)
 User::RegisterOrder('popular', function($query) {
     return $query->order(['score DESC', 'views DESC']);
 });
@@ -340,6 +393,8 @@ User::RegisterOrder('popular', function($query) {
 // Use custom sorting
 $popularUsers = User::Query()->sort('popular')->toArray();
 ```
+
+> Prefer `orderDefinitions()` on the model itself for new code — see [Declarative Filters & Sorts](#declarative-filters--sorts-modelboot).
 
 #### Binding Input Parameters to Prepared Statements
 
