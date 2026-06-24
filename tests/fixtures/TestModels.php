@@ -62,3 +62,10 @@ class UserLog extends Model
 {
     // Add userlog-specific methods if needed
 }
+
+/**
+ * Test model for composite primary key with auto-increment
+ */
+class TestingComposite extends Model
+{
+}
