@@ -212,3 +212,18 @@ $adapter->query("INSERT INTO `UserLog` (`user_id`, `action`) VALUES (1, 'login')
 
 echo "Relationship test data inserted successfully!\n";
 echo "Database setup completed!\n";
+
+// Drop and create TestingComposite table (for composite primary key + auto-increment tests)
+echo "Setting up TestingComposite table...\n";
+$adapter->query("DROP TABLE IF EXISTS `TestingComposite`", Adapter::QUERY_MODE_EXECUTE);
+$createTestingCompositeSql = "
+CREATE TABLE `TestingComposite` (
+    `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+    `tenant_id` int(10) unsigned NOT NULL,
+    `name` varchar(100) DEFAULT NULL,
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `tenant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+";
+$adapter->query($createTestingCompositeSql, Adapter::QUERY_MODE_EXECUTE);
+echo "TestingComposite table created successfully!\n";

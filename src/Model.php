@@ -216,9 +216,8 @@ abstract class Model extends RowGateway implements JsonSerializable
 
     public function save()
     {
-      $keys = self::_table()->getPrimaryKey();
+        $keys = self::_table()->getPrimaryKey();
         $table = self::_table();
-
 
         if ($this->rowExistsInDatabase()) {
             if (count($this->data) == 0 && count($this->changed) == 0) {
@@ -275,9 +274,10 @@ abstract class Model extends RowGateway implements JsonSerializable
 
 
         foreach ($keys as $key) {
-            $this->data[$key] = $this->original[$key];
+            if (!array_key_exists($key, $this->data)) {
+                $this->data[$key] = $this->original[$key];
+            }
         }
-
 
         foreach ($table->columns() as $column) {
             $colName = $column->getName();
@@ -293,7 +293,13 @@ abstract class Model extends RowGateway implements JsonSerializable
                         }
                     }
                 } else {
-                    if (!$this->data[$key]) { // 如果沒有主鍵，則不需要檢查
+                    $primaryKeyValues = [];
+                    foreach ($keys as $key) {
+                        $primaryKeyValues[] = $this->data[$key] ?? $this->original[$key] ?? null;
+                    }
+                    $hasRealPrimaryKey = count(array_filter($primaryKeyValues, fn($v) => $v !== null)) > 0;
+
+                    if (!$hasRealPrimaryKey) { // 如果沒有主鍵，則不需要檢查
                         if ($column->getColumnDefault() === null) {
                             if (in_array($column->getDataType(), ["int", "tinyint", "smallint", "mediumint", "bigint"])) {
                                 $this->data[$colName] = 0;
@@ -306,11 +312,46 @@ abstract class Model extends RowGateway implements JsonSerializable
             }
         }
 
-        
-        $this->changed = $this->data;
-        $result = parent::save();
-        $this->original = $this->data;
-        $this->data = [];
+        // When inserting a row with a composite primary key that contains an
+        // auto-increment column, Laminas RowGateway cannot refresh the row
+        // because it only uses the generated value when there is exactly one PK
+        // column. Temporarily narrow the PK to the auto-increment column for the
+        // insert, then restore the full composite key afterwards.
+        $autoIncrementKeys = [];
+        foreach ($table->columns() as $column) {
+            if ($column->isAutoIncrement()) {
+                $autoIncrementKeys[] = $column->getName();
+            }
+        }
+
+        $isCompositeAutoIncrementInsert = !$this->rowExistsInDatabase()
+            && count($keys) > 1
+            && count($autoIncrementKeys) > 0;
+
+        $originalPrimaryKeyColumn = $this->primaryKeyColumn;
+
+        if ($isCompositeAutoIncrementInsert) {
+            $this->primaryKeyColumn = $autoIncrementKeys;
+        }
+
+        try {
+            $this->changed = $this->data;
+            $result = parent::save();
+            $this->original = $this->data;
+            $this->data = [];
+        } finally {
+            if ($isCompositeAutoIncrementInsert) {
+                $this->primaryKeyColumn = $originalPrimaryKeyColumn;
+
+                if ($this->rowExistsInDatabase()) {
+                    foreach ($keys as $key) {
+                        if (!in_array($key, $autoIncrementKeys, true)) {
+                            $this->primaryKeyData[$key] = $this->original[$key] ?? null;
+                        }
+                    }
+                }
+            }
+        }
 
         return $result;
     }
