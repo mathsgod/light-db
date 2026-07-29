@@ -180,6 +180,21 @@ final class ModelTest extends BaseTestCase
 
     /**
      * @group validation
+     */
+    public function testNullUsesDatabaseDefaultOnInsert(): void
+    {
+        $model = Testing2::Create([
+            'name' => 'Database Default Test',
+            'state' => null,
+        ]);
+        $model->save();
+
+        $retrieved = Testing2::Get($model->testing2_id);
+        $this->assertSame('in_progress', $retrieved->state);
+    }
+
+    /**
+     * @group validation
      * @dataProvider booleanValueProvider
      */
     public function testBooleanHandling($value, $expected): void

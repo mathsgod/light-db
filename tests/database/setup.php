@@ -74,6 +74,7 @@ CREATE TABLE `Testing2` (
     `int_null` int(11) DEFAULT NULL COMMENT '可為空的整數',
     `null_field` varchar(255) DEFAULT NULL COMMENT '可為空欄位',
     `not_null_field` varchar(255) NOT NULL DEFAULT '' COMMENT '不可為空欄位',
+    `state` varchar(50) NOT NULL DEFAULT 'in_progress' COMMENT '有預設值的不可為空欄位',
     `json_data` json DEFAULT NULL COMMENT 'JSON 資料',
     `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`testing2_id`)

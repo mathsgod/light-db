@@ -218,8 +218,9 @@ abstract class Model extends RowGateway implements JsonSerializable
     {
         $keys = self::_table()->getPrimaryKey();
         $table = self::_table();
+        $rowExists = $this->rowExistsInDatabase();
 
-        if ($this->rowExistsInDatabase()) {
+        if ($rowExists) {
             if (count($this->data) == 0 && count($this->changed) == 0) {
                 return true; // no changes, no need to save
             }
@@ -230,6 +231,18 @@ abstract class Model extends RowGateway implements JsonSerializable
             if (!$column) continue;
 
             if ($column->isVirtualGenerated()) {
+                unset($this->data[$name]);
+                continue;
+            }
+
+            // On insert, treat null for a non-nullable column with a database
+            // default as omitted so the database can apply that default.
+            if (
+                !$rowExists
+                && $value === null
+                && !$column->isNullable()
+                && $column->getColumnDefault() !== null
+            ) {
                 unset($this->data[$name]);
                 continue;
             }
@@ -324,7 +337,7 @@ abstract class Model extends RowGateway implements JsonSerializable
             }
         }
 
-        $isCompositeAutoIncrementInsert = !$this->rowExistsInDatabase()
+        $isCompositeAutoIncrementInsert = !$rowExists
             && count($keys) > 1
             && count($autoIncrementKeys) > 0;
 
