@@ -98,7 +98,12 @@ jobs:
             ${{ runner.os }}-php-${{ matrix.php }}-${{ matrix.db_image }}-
             ${{ runner.os }}-php-${{ matrix.php }}-
 
-      - name: Install dependencies
+      - name: Resolve PHP 8.2-compatible dependencies
+        if: matrix.php == '8.2'
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Install locked dependencies
+        if: matrix.php != '8.2'
         run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Create .env file
