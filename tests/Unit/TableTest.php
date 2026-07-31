@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
+use Laminas\Db\RowGateway\RowGateway;
 use Light\Db\Table;
 
 /**
@@ -100,6 +101,22 @@ final class TableTest extends BaseTestCase
         // Verify remaining record
         $remaining = Testing::Query()->count();
         $this->assertEquals(1, $remaining);
+    }
+
+    /**
+     * @group table_operations
+     */
+    public function testTableRow(): void
+    {
+        $table = Testing::_table();
+        $table->truncate();
+        $table->insert(['name' => 'table_row_test']);
+
+        $row = $table->row(['name' => 'table_row_test']);
+
+        $this->assertInstanceOf(RowGateway::class, $row);
+        $this->assertEquals('table_row_test', $row->name);
+        $this->assertNull($table->row(['name' => 'missing_row']));
     }
 
     /**

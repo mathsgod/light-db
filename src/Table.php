@@ -460,7 +460,7 @@ class Table extends TableGateway
 
 
         //  new Table
-        $table = new TableGateway($this->name, $this->adapter, [
+        $table = new TableGateway($this->table, $this->adapter, [
             new MetadataFeature($meta),
             new RowGatewayFeature()
         ]);
