@@ -143,7 +143,12 @@ final class Query implements \IteratorAggregate, \Countable
     {
         foreach ($this->page() as $model) { yield $this->attach($model); }
     }
-    public function toArray(): array { return iterator_to_array($this, false); }
+    public function toArray(): array
+    {
+        $models = $this->page()->toArray();
+        foreach ($models as $model) { $this->attach($model); }
+        return $models;
+    }
     public function asEnumerable(): IEnumerable { return Enumerable::from($this); }
     public function sum(string $field): int|float|string { return $this->set->asQueryable()->sum($this->field($field)); }
     public function avg(string $field): int|float|string|null { return $this->set->asQueryable()->average($this->field($field)); }

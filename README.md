@@ -130,6 +130,25 @@ integration, joins/projection wrappers, legacy `wasChanged()`/audit hooks and
 schema-management wrappers are also outside this first core implementation.
 The old Laminas Query/Predicate API is intentionally not emulated.
 
+## Read-path optimization
+
+For conventional dynamic Models, hydration already produces validated model
+attributes. The original snapshot reuses that array with PHP copy-on-write,
+avoiding a second per-column read/validation pass. The standard JSON decoder
+produces arrays/scalars without references, so its hydrated snapshot can also
+share storage until mutation rather than immediately encode/decode a second
+copy. This optimization does not apply to custom converters or magic accessors;
+the general validation/comparer path is retained for them and public typed
+properties. Save-time snapshots keep their existing comparer behavior.
+
+JSON serialization caches public-property metadata per class and reads values
+per instance. Dynamic/custom-setter cases retain the generic serialization path.
+`Query::toArray()` attaches Models directly to the materialized array rather
+than collecting a second array through the iterator. Ordinary `foreach` still
+finishes the database result before application code can issue other queries.
+
+Benchmarks and before/after results: [query → JSON](benchmarks/query-json/README.md).
+
 ## Tests
 
 PHP >= 8.3 is required. This development checkout uses the sibling light-entity

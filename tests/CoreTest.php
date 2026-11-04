@@ -37,6 +37,62 @@ class ConvertedUser extends Model
     }
 }
 
+class JsonObjectUser extends Model
+{
+    protected static $_table = 'User';
+    public static function valueConverters(): array
+    {
+        return ['settings'=>new \Light\Entity\ValueConverter(fn ($v)=>json_encode($v, JSON_THROW_ON_ERROR),fn ($v)=>json_decode($v,false,512,JSON_THROW_ON_ERROR))];
+    }
+    public static function valueComparers(): array
+    {
+        return ['settings'=>new \Light\Entity\ValueComparer(fn ($a,$b)=>$a==$b,fn ($v)=>json_decode(json_encode($v,JSON_THROW_ON_ERROR),false,512,JSON_THROW_ON_ERROR))];
+    }
+}
+class ObjectSetterUser extends Model
+{
+    protected static $_table = 'User';
+    public function __set(string $name, mixed $value): void
+    {
+        if ($name === 'settings' && $value !== null) { $value=json_decode(json_encode($value,JSON_THROW_ON_ERROR),false,512,JSON_THROW_ON_ERROR); }
+        parent::__set($name,$value);
+    }
+}
+class GetterUser extends Model
+{
+    protected static $_table = 'User';
+    public function &__get(string $name): mixed
+    {
+        $value =& parent::__get($name);
+        if ($name==='name') { $display=strtoupper($value); return $display; }
+        return $value;
+    }
+}
+#[\AllowDynamicProperties]
+class DynamicUser extends Model
+{
+    protected static $_table = 'User';
+    public function __set(string $name, mixed $value): void
+    {
+        if ($name==='extra') { $this->extra=$value; return; }
+        parent::__set($name,$value);
+    }
+}
+
+class MissingComparerUser extends Model
+{
+    protected static $_table = 'User';
+    public static function valueConverters(): array
+    {
+        return ['name'=>new \Light\Entity\ValueConverter(fn ($v)=>$v->name,fn ($v)=>(object)['name'=>$v])];
+    }
+}
+class IssetUser extends Model
+{
+    protected static $_table = 'User';
+    public function __isset(string $name): bool { return $name==='name' ? false : parent::__isset($name); }
+}
+
 final class CoreTest extends TestCase
 {
     private PDO $pdo;
@@ -288,6 +344,63 @@ final class CoreTest extends TestCase
         } finally { $this->pdo->rollBack(); }
         self::assertTrue($user->isDirty());
         self::assertSame(1,$user->save());
+    }
+
+    public function testSharedHydratedJsonSnapshotSurvivesNestedReferencesAndRetry(): void
+    {
+        $user=User::Get(1);
+        self::assertFalse($user->isDirty());
+        $tags =& $user->settings['nested']['tags']; $tags[]='reference';
+        self::assertTrue($user->isDirty('settings'));
+        self::assertSame(['a'],User::Get(1)->settings['nested']['tags']);
+        $user->name='Bob';
+        try { $user->save(); self::fail('Expected uniqueness failure.'); }
+        catch (\PDOException) { self::assertTrue($user->isDirty('settings')); }
+        $user->name='After retry'; self::assertSame(1,$user->save());
+        self::assertSame(['a','reference'],User::Get(1)->settings['nested']['tags']);
+        self::assertFalse($user->isDirty());
+    }
+
+    public function testCustomComparersAndSettersStillUseIndependentSnapshots(): void
+    {
+        foreach ([JsonObjectUser::class,ObjectSetterUser::class] as $class) {
+            $user=$class::Get(1);
+            self::assertFalse($user->isDirty());
+            $user->settings->nested->tags[]=$class;
+            self::assertTrue($user->isDirty('settings'));
+            self::assertSame(1,$user->save());
+            self::assertFalse($user->isDirty());
+        }
+        $user=GetterUser::Get(1);
+        self::assertSame('ADA',$user->name);
+        self::assertFalse($user->isDirty());
+        self::assertSame('Ada',$user->toArray()['name']);
+    }
+
+    public function testSerializationCacheKeepsPublicValuesAndDynamicPropertiesPerInstance(): void
+    {
+        $a=TypedUser::Get(1); $b=TypedUser::Get(2);
+        self::assertSame('Ada',$a->toArray()['name']);
+        self::assertSame('Bob',$b->toArray()['name']);
+        self::assertNull($b->toArray()['settings']);
+        unset($b->name);
+        self::assertArrayNotHasKey('name',$b->toArray());
+        $dynamic=DynamicUser::Get(1); $dynamic->extra='One';
+        self::assertSame('One',$dynamic->toArray()['extra']);
+        self::assertArrayNotHasKey('extra',DynamicUser::Get(2)->toArray());
+        self::assertArrayNotHasKey('propertyMetadata',$a->toArray());
+    }
+
+    public function testCustomIssetRetainsMappingSnapshotSemantics(): void
+    {
+        $user=IssetUser::Get(1);
+        self::assertFalse($user->isDirty());
+    }
+
+    public function testNonScalarCustomConverterStillRequiresComparerAtRead(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        MissingComparerUser::Get(1);
     }
 
     public function testKeyChangesAreRejected(): void

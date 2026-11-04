@@ -18,6 +18,8 @@ abstract class Model extends Entity
     private static array $filters = [];
     private static array $orders = [];
     private static array $booted = [];
+    /** @var array<class-string, array{properties:list<\ReflectionProperty>, simple:bool, dynamic:bool}> */
+    private static array $propertyMetadata = [];
 
     final public function __construct(array $attributes = [])
     {
@@ -42,7 +44,38 @@ abstract class Model extends Entity
     public function __set(string $name, mixed $value): void { $this->attributes[$name] = $value; }
     public function __isset(string $name): bool { return isset($this->attributes[$name]); }
     public function hasValue(string $name): bool { return array_key_exists($name, $this->attributes); }
-    public function jsonSerialize(): array { return array_replace($this->attributes, parent::jsonSerialize()); }
+    private static function propertyMetadata(): array
+    {
+        if (isset(self::$propertyMetadata[static::class])) { return self::$propertyMetadata[static::class]; }
+        $reflection = new \ReflectionClass(static::class);
+        $properties = [];
+        foreach ($reflection->getProperties(\ReflectionProperty::IS_PUBLIC) as $property) {
+            if (!$property->isStatic() && !(PHP_VERSION_ID >= 80400 && $property->isVirtual())) { $properties[] = $property; }
+        }
+        $customSetter = $reflection->getMethod('__set')->getDeclaringClass()->getName() !== self::class;
+        $customGetter = $reflection->getMethod('__get')->getDeclaringClass()->getName() !== self::class;
+        $customIsset = $reflection->getMethod('__isset')->getDeclaringClass()->getName() !== self::class;
+        $dynamic = $customSetter;
+        for ($type = $reflection; $type !== false; $type = $type->getParentClass()) {
+            if ($type->getAttributes(\AllowDynamicProperties::class) !== []) { $dynamic = true; break; }
+        }
+        return self::$propertyMetadata[static::class] = [
+            'properties'=>$properties, 'simple'=>$properties === [] && !$customSetter && !$customGetter && !$customIsset && !$dynamic, 'dynamic'=>$dynamic,
+        ];
+    }
+
+    public function jsonSerialize(): array
+    {
+        $metadata = self::propertyMetadata();
+        if ($metadata['dynamic']) { return array_replace($this->attributes, parent::jsonSerialize()); }
+        $values = $this->attributes;
+        foreach ($metadata['properties'] as $property) {
+            if ($property->isInitialized($this)) {
+                $values[$property->getName()] = PHP_VERSION_ID >= 80400 ? $property->getRawValue($this) : $property->getValue($this);
+            }
+        }
+        return $values;
+    }
     public function toArray(): array { return $this->jsonSerialize(); }
 
     /** @return Query<static> */
@@ -88,7 +121,10 @@ abstract class Model extends Entity
     public function attachRecord(Database $database, EntityMapping $mapping, bool $persisted = true): void
     {
         $this->owner = $database; $this->mapping = $mapping; $this->persisted = $persisted;
-        $this->original = $persisted ? $mapping->snapshotValues($mapping->values($this)) : [];
+        if (!$persisted) { $this->original = []; return; }
+        $this->original = self::propertyMetadata()['simple']
+            ? ($mapping->comparers === [] && $mapping->converters === [] ? $this->attributes : ModelMetadata::snapshotHydrated($mapping, $this->attributes, $this))
+            : $mapping->snapshotValues($mapping->values($this));
     }
 
     private function getMapping(): EntityMapping
