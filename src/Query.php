@@ -18,6 +18,7 @@ final class Query implements \IteratorAggregate, \Countable
     private int $offset = 0;
     private bool $ordered = false;
     private bool $readOnly = false;
+    private ?array $ignoredFilters = [];
 
     /** @param class-string<T> $class */
     public function __construct(private readonly Database $database, private readonly string $class)
@@ -30,6 +31,15 @@ final class Query implements \IteratorAggregate, \Countable
     public function asReadOnly(): self
     {
         $copy = clone $this; $copy->readOnly = true; return $copy;
+    }
+
+    /** Disable all global query filters, or only the supplied names. @return self<T> */
+    public function ignoreQueryFilters(?array $names = null): self
+    {
+        $copy = clone $this;
+        $copy->set = $this->set->ignoreQueryFilters($names);
+        $copy->ignoredFilters = $names === null || $this->ignoredFilters === null ? null : array_values(array_unique([...$this->ignoredFilters, ...$names]));
+        return $copy;
     }
 
     public function getClassName(): string { return $this->class; }
@@ -55,7 +65,7 @@ final class Query implements \IteratorAggregate, \Countable
             if ($callback === null) { $query = $query->where([$name=>$value]); continue; }
             $result = $callback($value, $query);
             $query = match (true) {
-                $result instanceof self => $this->checkCustomQuery($result),
+                $result instanceof self => $query->checkCustomQuery($result),
                 $result instanceof ValueExpression || is_array($result) => $query->where($result),
                 default => throw new \LogicException('Registered filters must return a Query, expression or condition map.'),
             };
@@ -68,6 +78,7 @@ final class Query implements \IteratorAggregate, \Countable
         if ($query->database !== $this->database || $query->class !== $this->class) {
             throw new \LogicException('A registered callback must return a query for the same Model and Database.');
         }
+        if ($this->ignoredFilters === null || $this->ignoredFilters !== []) { $query = $query->ignoreQueryFilters($this->ignoredFilters); }
         return $this->readOnly ? $query->asReadOnly() : $query;
     }
 
@@ -97,7 +108,7 @@ final class Query implements \IteratorAggregate, \Countable
             $callback = $this->class::registered('order', $match[1]);
             if ($callback === null) { $query = $query->orderBy($match[1], $descending); continue; }
             $result = $callback($descending ? 'desc' : 'asc', $query);
-            $query = $result instanceof self ? $this->checkCustomQuery($result)
+            $query = $result instanceof self ? $query->checkCustomQuery($result)
                 : ($result instanceof ValueExpression ? $query->orderBy($result, $descending)
                     : throw new \LogicException('Registered orders must return a Query or expression.'));
         }

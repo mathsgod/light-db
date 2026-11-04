@@ -50,14 +50,14 @@ final class Database
     public function set(string $class): DbSet
     {
         $mapping = $this->metadata($class);
-        $context = $this->contexts[$class] ??= new DbContext($this->pdo, mappings: [$mapping]);
+        $context = $this->contexts[$class] ??= new ModelDbContext($this->pdo, $mapping);
         return $context->set($class)->asNoTracking();
     }
 
     /** @internal One Model save must not flush changes belonging to another Model. */
     public function writeContext(EntityMapping $mapping): DbContext
     {
-        return new DbContext($this->pdo, mappings: [$mapping]);
+        return new ModelDbContext($this->pdo, $mapping);
     }
 
     public function clearMetadata(): void

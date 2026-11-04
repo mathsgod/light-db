@@ -201,3 +201,40 @@ To check isolation with a reproducible shuffled order:
 vendor/bin/phpunit --order-by=random --random-order-seed=20261104
 composer test:mysql -- --order-by=random --random-order-seed=20261104
 ```
+
+## Global query filters
+
+Model definitions are registered through the native light-entity
+`onModelCreating()`/ModelBuilder pipeline:
+
+```php
+class User extends \Light\Db\Model
+{
+    protected static function queryFilterDefinitions(): array
+    {
+        return [
+            'softDelete' => \Light\Linq\Expr::eq(\Light\Linq\Expr::field('is_deleted'), 0),
+            // Resolve application request state when the query executes:
+            'tenant' => fn () => ['tenant_id' => CurrentTenant::id()],
+        ];
+    }
+}
+
+User::Query()->toArray(); // Both filters apply.
+User::Query()->asReadOnly()->toArray(); // Same filters, no Model snapshots.
+User::Query()->ignoreQueryFilters(['softDelete'])->toArray(); // Keep tenant scope.
+User::Query()->ignoreQueryFilters()->toArray(); // Disable all query filters.
+```
+
+Filters affect Get, query reads, count/aggregates, cursor and bulk update/delete.
+They use ordinary compiler parameter binding and converter rules. Ignoring filters
+is query-local, accumulates named exclusions and preserves read-only behavior.
+Registered filter/order callbacks returning a fresh Query retain those scopes.
+Existing RegisterFilter/filterDefinitions remain explicitly selected search filters;
+queryFilterDefinitions are automatic predicates. Native saveChanges semantics are
+unchanged: an explicitly loaded writable Model can save its changes even if it was
+loaded by ignoring a filter. Soft-delete writes require separate application logic.
+
+`CurrentTenant` above represents your application's tenant resolver. Ordinary
+queries without queryFilterDefinitions retain their existing behavior. Full native
+filter and relationship semantics are documented in light-entity's README.

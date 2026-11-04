@@ -144,6 +144,17 @@ abstract class Model extends Entity
         return array_intersect_key($mapping->values($this), array_flip($mapping->keys));
     }
 
+    /** Named predicates applied automatically to every query for this Model. */
+    protected static function queryFilterDefinitions(): array { return []; }
+
+    /** @internal */
+    final public static function configureEntity(\Light\Entity\EntityTypeBuilder $builder): void
+    {
+        foreach (static::queryFilterDefinitions() as $name => $filter) {
+            $builder->hasQueryFilter($name, $filter);
+        }
+    }
+
     public static function valueConverters(): array { return []; }
     public static function valueComparers(): array { return []; }
     protected static function filterDefinitions(): array { return []; }

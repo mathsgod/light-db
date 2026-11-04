@@ -111,7 +111,7 @@
             "dist": {
                 "type": "path",
                 "url": "../light-entity",
-                "reference": "10a64794018272536109de406cf3a4c6c10d3d8e"
+                "reference": "2064f7f64fe4cad2bd6f26ed6670101f3df3a873"
             },
             "require": {
                 "ext-pdo": "*",
