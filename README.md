@@ -186,3 +186,18 @@ composer analyse     # PHPStan level 5
 Each test uses a fresh SQLite database or creates/drops its own randomly named
 MySQL schema. No existing framework database is used. Override
 `LIGHT_DB_TEST_PORT` to select another Docker port.
+
+The PHPUnit suite covers Model lifecycle, converters/snapshot isolation,
+computed and composite-key fields, read-only guards, structured filter operators,
+malformed filters, literal wildcard escaping, incompatible filter/order callbacks,
+fresh-query behavior, and pagination boundaries. A 100-record fixture with no
+JSON columns checks ordinary/read-only Model output against PDO rows and verifies
+that ordinary Models still save changes independently. Both database backends
+run the same tests through the shared `DatabaseTestCase` fixture.
+
+To check isolation with a reproducible shuffled order:
+
+```bash
+vendor/bin/phpunit --order-by=random --random-order-seed=20261104
+composer test:mysql -- --order-by=random --random-order-seed=20261104
+```

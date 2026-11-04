@@ -198,3 +198,39 @@ Read-only skips `snapshotEntity()` entirely. Model Database/mapping references,
 converters and serialization remain. Model save/delete, query bulk writes and
 isDirty are guarded. SQLite and MySQL each pass 24 tests / 169 assertions;
 PHPStan level 5 passes. Raw samples: `results-readonly-100.json` (gitignored).
+
+## Direct Laminas DB — 100 records, no JSON column
+
+Run `python3 benchmarks/query-json/run-laminas.py 50 100`. The plain fixture
+contains user_id, name, email, age, DECIMAL balance, created_at and payload;
+there is no JSON column in the queried table. There are 300 randomized fresh
+workers across ordinary v2, read-only v2 and direct Laminas, cold and warm.
+All complete output JSON bytes match. The unused JSON fixture table is seeded
+by the shared harness but never queried by this runner.
+
+Laminas uses Adapter/Sql/select/prepare/execute followed by full materialization
+of associative rows; light-db returns User Model objects. Connection and client
+setup are outside timing, while cold first-use class loading, SQL construction
+and light-db schema discovery remain inside. Warm fully runs the query and
+serialization once beforehand. Each warm case executes one SELECT; cold
+light-db additionally performs SELECT DATABASE() and schema discovery (3 calls
+versus 1 for direct Laminas). These are PDO prepare/query API counters, not
+measurements of wire-level network round trips.
+
+| Mode | API | Read/materialize median ms | Including JSON median ms | Peak growth MiB |
+| --- | --- | ---: | ---: | ---: |
+| warm | new | 0.9755 | 1.0344 | 0.1493 |
+| warm | readonly | 0.9043 | 0.9682 | 0.1493 |
+| warm | laminas | 0.9159 | 0.9562 | 0.1350 |
+| cold | new | 8.2313 | 8.2965 | 1.0742 |
+| cold | readonly | 8.2087 | 8.2800 | 1.0742 |
+| cold | laminas | 4.4363 | 4.4776 | 0.6810 |
+
+Warm total medians put ordinary light-db about 8% above Laminas and read-only
+about 1% above Laminas. Paired 95% bootstrap intervals (5,000 resamples,
+seed 42) for light-db minus Laminas total time are [-0.007, 0.153] ms
+(ordinary) and [-0.031, 0.092] ms (read-only); both cross zero. This run does
+not establish a stable warm speed difference. Cold Laminas is faster in this
+fixture. Model hydration and snapshots provide semantics beyond raw rows,
+so the result is a comparison of these APIs, not identical internal work.
+Raw samples: `results-laminas-100.json` (gitignored).

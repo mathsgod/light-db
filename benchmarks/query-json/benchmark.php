@@ -43,12 +43,24 @@ if ($action==='seed') {
 }
 if ($action!=='worker') { throw new InvalidArgumentException('Use seed or worker.'); }
 [$variant,$mode,$workload]=[$argv[2],$argv[3],$argv[4]];
-if (!in_array($variant,['old','baseline','new','entity','entity-no-tracking','profile','readonly'],true) || !in_array($mode,['cold','warm'],true) || !in_array($workload,['plain','json'],true)) {
+if (!in_array($variant,['old','baseline','new','entity','entity-no-tracking','profile','readonly','laminas'],true) || !in_array($mode,['cold','warm'],true) || !in_array($workload,['plain','json'],true)) {
     throw new InvalidArgumentException('Invalid worker arguments.');
 }
 $newRoot=dirname(__DIR__,2);
 $oldRoot=getenv('LIGHT_DB_OLD_ROOT') ?: dirname($newRoot).'/light-db';
 require ($variant==='old'?$oldRoot:$newRoot).'/vendor/autoload.php';
+if ($variant === 'laminas') {
+    // Load only Laminas namespaces; do not load the legacy light-db Model.
+    spl_autoload_register(static function (string $class) use ($oldRoot): void {
+        foreach (['Laminas\\Db\\'=>'laminas-db', 'Laminas\\Stdlib\\'=>'laminas-stdlib'] as $prefix=>$package) {
+            if (str_starts_with($class, $prefix)) {
+                $file=$oldRoot.'/vendor/laminas/'.$package.'/src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';
+                if (is_file($file)) { require $file; }
+            }
+        }
+    });
+}
+
 if ($variant==='old' || $variant==='baseline') {
     $source=getenv($variant==='old' ? 'LIGHT_DB_OLD_SOURCE' : 'LIGHT_DB_BASELINE_SOURCE');
     if (!$source) { throw new RuntimeException('The runner must provide the archived old source.'); }
@@ -72,9 +84,15 @@ if ($variant==='old') {
     User::SetAdapter(new Light\Db\Adapter(new Laminas\Db\Adapter\Driver\Pdo\Pdo($pdo)));
 } else { Light\Db\Database::setDefault(new Light\Db\Database($pdo)); }
 User::useTable('bench_'.$workload.'_users');
+$laminas = $variant === 'laminas' ? new \Laminas\Db\Adapter\Adapter(new \Laminas\Db\Adapter\Driver\Pdo\Pdo($pdo)) : null;
 $context = null;
 $profile = [];
-$fetch = static function () use ($variant, $pdo, &$context, &$profile): array {
+$fetch = static function () use ($variant, $pdo, $laminas, $workload, &$context, &$profile): array {
+    if ($variant === 'laminas') {
+        $sql = new \Laminas\Db\Sql\Sql($laminas);
+        $statement = $sql->prepareStatementForSqlObject($sql->select('bench_'.$workload.'_users'));
+        return iterator_to_array($statement->execute(), false);
+    }
     if ($variant === 'profile') {
         $start = hrtime(true);
         $database = \Light\Db\Database::getDefault();
