@@ -1,367 +1,214 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Light\Db;
 
-use Laminas\Db\Sql\Select;
-use Exception;
-use Illuminate\Support\LazyCollection;
-use IteratorAggregate;
-use Laminas\Db\Adapter\AdapterInterface;
-use Laminas\Db\Adapter\ParameterContainer;
-use Laminas\Db\Adapter\Platform\PlatformInterface;
-use Laminas\Db\Sql\Expression;
-use Laminas\Db\Sql\Predicate\Predicate;
-use Laminas\Db\TableGateway\Feature\RowGatewayFeature;
-use Laminas\Paginator\Paginator;
-use Light\Db\Paginator\Adapter;
-use PhpParser\Node\Expr;
-use Traversable;
-use ReflectionClass;
+use Light\Entity\{DbSet, EntityMapping};
+use Light\Entity\Sql\{MySqlDialect, NotExpression, RawSqlPredicateExpression, SqliteDialect};
+use Light\Linq\{Enumerable, Expr, IEnumerable};
+use Light\Linq\Expression\ValueExpression;
 
-/**
- * @template T
- * @method static order(string|array|Expression $order)
- * @method static limit(int $limit)
- * @method static offset(int $offset)
- * @method static where(\Laminas\Db\Sql\Where|\Closure|string|array|\Laminas\Db\Sql\Predicate\PredicateInterface $predicate,string $combination = Predicate\PredicateSet::OP_AND)
- */
-class Query extends Select implements IteratorAggregate
+/** @template T of Model @implements \IteratorAggregate<int,T> */
+final class Query implements \IteratorAggregate, \Countable
 {
-    private readonly string $class;
-    private readonly ?Table $_table;
-    private readonly ?\Laminas\Db\Adapter\Adapter $adapter;
-    private bool $_custom_column = false;
+    private DbSet $set;
+    private EntityMapping $mapping;
+    private ?int $limit = null;
+    private int $offset = 0;
+    private bool $ordered = false;
 
-    /**
-     * @param class-string<T> $class
-     */
-    public function __construct(string $class, Table $table)
+    /** @param class-string<T> $class */
+    public function __construct(private readonly Database $database, private readonly string $class)
     {
-        if (is_subclass_of($class, Model::class)) {
-            $class::boot();
-        }
-        $this->class = $class;
-        parent::__construct($table->getTable());
-        $this->adapter = $table->getAdapter();
-        $this->_table = $table; // Initialize $_table with the provided Table instance
+        $this->mapping = $database->metadata($class);
+        $this->set = $database->set($class);
     }
 
-    public function getSqlString(?PlatformInterface $adapterPlatform = null)
+    public function getClassName(): string { return $this->class; }
+    /** @return self<T> */
+    public function where(ValueExpression|array $condition): self
     {
-        $adapterPlatform = $adapterPlatform ?:  $this->adapter->getPlatform();
-        return $this->buildSqlString($adapterPlatform);
+        $copy = clone $this;
+        $copy->set = $this->set->where(is_array($condition) ? $this->expression($condition) : $condition);
+        return $copy;
+    }
+    /** @return self<T> */
+    public function whereRaw(string $sql, array $parameters = []): self
+    {
+        $copy = clone $this; $copy->set = $this->set->whereRaw($sql, $parameters); return $copy;
     }
 
-    private static $Order = [];
-    static function RegisterOrder(string $class, string $name, callable $callback)
+    /** @return self<T> */
+    public function filters(?array $filters): self
     {
-        self::$Order[$class][$name] = $callback;
-    }
-
-
-    private static $Filters = [];
-    static function RegisterFilter(string $class, string $name, callable $callback)
-    {
-        self::$Filters[$class][$name] = $callback;
-    }
-
-    public function getClassName()
-    {
-        return $this->class;
-    }
-
-    private function getExecuteTable()
-    {
-        if (count($this->columns) == 1 && $this->columns[0] == "*") {
-            //get primary key
-            $primaryKey = $this->_table->getPrimaryKey();
-            //reflector class
-            $ref_class = new ReflectionClass($this->class);
-            $instance = $ref_class->newInstanceArgs([
-                $primaryKey,
-                $this->_table->getTable(),
-                $this->adapter
-            ]);
-            $table = new Table($this->table, $this->adapter, new RowGatewayFeature($instance));
-        } else {
-            $table = new Table($this->table, $this->adapter);
-        }
-        return $table;
-    }
-
-    public function cursor(array $input_parameters = [])
-    {
-        return new LazyCollection(function () use ($input_parameters) {
-            $table = $this->getExecuteTable();
-            $sql = $table->getSql();
-            $statement = $sql->prepareStatementForSqlObject($this);
-
-            if (!empty($input_parameters)) {
-                $parameterContainer = $statement->getParameterContainer();
-                if ($parameterContainer instanceof ParameterContainer) {
-                    foreach ($input_parameters as $name => $value) {
-                        $parameterContainer->offsetSet($name, $value);
-                    }
-                }
-            }
-
-            $result = $statement->execute();
-            $resultSet = clone $table->getResultSetPrototype();
-            $resultSet->initialize($result);
-
-            foreach ($resultSet as $row) {
-                yield $row;
-            }
-        });
-    }
-
-    /**
-     * @return static
-     */
-    public function columns(array $columns, $prefixColumnsWithTable = true)
-    {
-        $this->_custom_column = true;
-        return parent::columns($columns, $prefixColumnsWithTable);
-    }
-
-    public function count(): int
-    {
-        return $this->_table->count($this->where);
-    }
-
-    /**
-     * Retrieves the first result from the query, or null if no results are found.
-     *
-     * Clones the current query, sets the offset to 0 and the limit to 1,
-     * then executes the query and returns the first result if available.
-     *
-     * @return T|null The first result of the query, or null if no results exist.
-     */
-    public function first()
-    {
-        $c = clone $this;
-        $c->offset(0);
-        $c->limit(1);
-        $result = $c->toArray();
-        if (count($result) > 0) {
-            return $result[0];
-        }
-        return null;
-    }
-
-    public function collect()
-    {
-        return $this->execute();
-    }
-
-    public function avg(string $column)
-    {
-        return $this->_table->avg($column, $this->where);
-    }
-
-    public function sum(string $column)
-    {
-        return $this->_table->sum($column, $this->where);
-    }
-
-    public function max(string $column)
-    {
-        return $this->_table->max($column, $this->where);
-    }
-
-    public function min(string $column)
-    {
-        return $this->_table->min($column, $this->where);
-    }
-
-
-    public function execute(array $input_parameters = [])
-    {
-        $a = collect([]);
-        foreach ($this->cursor($input_parameters) as $obj) {
-            if ($this->_custom_column) {
-                $aa = [];
-                foreach ($obj as $k => $v) {
-                    $aa[$k] = $v;
-                }
-                $a->add($aa);
-            } else {
-                $a->add($obj);
-            }
-        }
-        return $a;
-    }
-
-    function getIterator(): Traversable
-    {
-        return $this->cursor();
-    }
-
-
-    /**
-     * Converts the current query result set to an array.
-     *
-     * Iterates over the query results and returns them as an array of type T.
-     *
-     * @return T[] An array containing all elements from the query result.
-     */
-    public function toArray()
-    {
-        return iterator_to_array($this);
-    }
-
-    public function delete()
-    {
-        return (new Table($this->table, $this->adapter))->delete($this->where);
-    }
-
-    public function update(array $values)
-    {
-        return (new Table($this->table, $this->adapter))->update($values, $this->where);
-    }
-
-    public function sort(?string $sort)
-    {
-        $query = clone $this;
-        if ($sort) {
-            $sorts = explode(",", $sort);
-
-            foreach ($sorts as $sort) {
-                $sort = trim($sort);
-
-                //replace ":" to " "
-                $sort = str_replace(":", " ", $sort);
-
-                $s = explode(" ", $sort);
-
-                if (isset(self::$Order[$this->class][$s[0]])) {
-                    $query->order([self::$Order[$this->class][$s[0]]($s[1])]);
-                } else {
-                    $query->order($sort);
-                }
-            }
+        $query = $this;
+        foreach ($filters ?? [] as $name => $value) {
+            $callback = $this->class::registered('filter', (string)$name);
+            if ($callback === null) { $query = $query->where([$name=>$value]); continue; }
+            $result = $callback($value, $query);
+            $query = match (true) {
+                $result instanceof self => $this->checkCustomQuery($result),
+                $result instanceof ValueExpression || is_array($result) => $query->where($result),
+                default => throw new \LogicException('Registered filters must return a Query, expression or condition map.'),
+            };
         }
         return $query;
     }
 
-
-    private function processFilter(Predicate $where, $filter)
+    private function checkCustomQuery(self $query): self
     {
-        if ($filter === null) {
-            return;
+        if ($query->database !== $this->database || $query->class !== $this->class) {
+            throw new \LogicException('A registered callback must return a query for the same Model and Database.');
         }
-        //check $filter is numberic array
-        if (array_values($filter) === $filter) {
-            foreach ($filter as $f) {
-                $this->processFilter($where, $f);
-            }
-            return;
-        }
-
-        foreach ($filter as $k => $v) {
-            if ($k == "_or") {
-                $orPredicate = $where->nest();
-
-                $isFirst = true;
-                foreach ($v as $orCondition) {
-                    if (!$isFirst) {
-                        $orPredicate = $orPredicate->or;
-                    }
-
-                    // 對於 OR 條件，我們需要為每個子條件創建一個嵌套的 predicate
-                    if (is_array($orCondition) && count($orCondition) > 0) {
-                        $subPredicate = $orPredicate->nest();
-                        $this->processFilter($subPredicate, $orCondition);
-                        $subPredicate->unnest();
-                    }
-
-                    $isFirst = false;
-                }
-                $orPredicate->unnest();
-                continue;
-            }
-
-            // 添加 _and 支援
-            if ($k == "_and") {
-                $andPredicate = $where->nest();
-
-                $isFirst = true;
-                foreach ($v as $andCondition) {
-                    if (!$isFirst) {
-                        $andPredicate = $andPredicate->and;
-                    }
-                    $this->processFilter($andPredicate, $andCondition);
-                    $isFirst = false;
-                }
-                $andPredicate->unnest();
-                continue;
-            }
-
-            if (isset(self::$Filters[$this->class][$k])) {
-                $predicate = new Predicate;
-                $exp = self::$Filters[$this->class][$k]($v, $predicate);
-                if (!$exp) {
-                    $exp = $predicate;
-                }
-            } else {
-                $exp = $k;
-            }
-
-            // If the expression is a callable result (like a subquery string), use it as a literal expression
-            if (isset(self::$Filters[$this->class][$k])) {
-
-                if ($exp instanceof Predicate) {
-                    $where->addPredicate($exp);
-                    continue;
-                }
-
-                if ($exp) {
-                    $where->literal($exp);
-                }
-            } elseif (is_array($v)) {
-                // 使用 FilterHelper 處理複雜的過濾條件
-                $filterPredicate = FilterHelper::processFilterValue($exp, $v);
-                $where->addPredicate($filterPredicate);
-            } else {
-                $where->equalTo($exp, $v);
-            }
-        }
-    }
-    /**
-     * Applies multiple filters to the query.
-     *
-     * Clones the current query, processes the provided filters, and returns a new query instance with the applied filters.
-     *
-     * @param array|null $filters An associative array of filters to apply. Each key is a field name, and each value is either a value or an array of conditions.
-     *                            Special keys like `_or` and `_and` can be used for logical grouping of conditions.
-     * @return static A new query instance with the applied filters.
-     */
-    public function filters(?array $filters)
-    {
-        $query = clone $this;
-        $this->processFilter($query->where, $filters);
         return $query;
     }
 
-    public function filter(callable $filter)
+    /** @return self<T> */
+    public function orderBy(string|ValueExpression $field, bool $descending = false): self
     {
-        return collect($this)->filter($filter);
+        $value = is_string($field) ? $this->field($field) : $field;
+        $copy = clone $this;
+        $copy->set = $this->ordered
+            ? ($descending ? $this->set->thenByDescending($value) : $this->set->thenBy($value))
+            : ($descending ? $this->set->orderByDescending($value) : $this->set->orderBy($value));
+        $copy->ordered = true;
+        return $copy;
     }
 
-    public function map(callable $map)
+    /** @return self<T> */
+    public function order(string|array $order): self
     {
-        return collect($this)->map($map);
-    }
-
-    public function getPaginator()
-    {
-        return new Paginator(new Adapter($this));
-    }
-
-    public function each(callable $callback)
-    {
-        foreach ($this as $obj) {
-            $callback($obj);
+        $query = $this;
+        foreach (is_array($order) ? $order : explode(',', $order) as $name => $direction) {
+            $spec = is_string($name) ? $name.' '.$direction : str_replace(':', ' ', trim($direction));
+            if ($spec === '') { continue; }
+            if (!preg_match('/^([A-Za-z_][A-Za-z0-9_]*)(?:\s+(asc|desc))?$/iD', $spec, $match)) {
+                throw new \InvalidArgumentException('Use field:asc/desc or field ASC/DESC ordering.');
+            }
+            $descending = strtolower($match[2] ?? 'asc') === 'desc';
+            $callback = $this->class::registered('order', $match[1]);
+            if ($callback === null) { $query = $query->orderBy($match[1], $descending); continue; }
+            $result = $callback($descending ? 'desc' : 'asc', $query);
+            $query = $result instanceof self ? $this->checkCustomQuery($result)
+                : ($result instanceof ValueExpression ? $query->orderBy($result, $descending)
+                    : throw new \LogicException('Registered orders must return a Query or expression.'));
         }
+        return $query;
+    }
+    /** @return self<T> */
+    public function sort(?string $order): self { return $order === null ? $this : $this->order($order); }
+    /** @return self<T> */
+    public function limit(int $count): self
+    {
+        if ($count < 0) { throw new \InvalidArgumentException('Limit cannot be negative.'); }
+        $copy = clone $this; $copy->limit = $count; return $copy;
+    }
+    /** @return self<T> */
+    public function offset(int $count): self
+    {
+        if ($count < 0) { throw new \InvalidArgumentException('Offset cannot be negative.'); }
+        $copy = clone $this; $copy->offset = $count; return $copy;
+    }
+    /** @return self<T> */
+    public function take(int $count): self { return $this->limit($count); }
+    /** @return self<T> */
+    public function skip(int $count): self { return $this->offset($count); }
+    private function page(): DbSet
+    {
+        $set = $this->offset > 0 ? $this->set->skip($this->offset) : $this->set;
+        return $this->limit === null ? $set : $set->take($this->limit);
+    }
+    /** @param T $model @return T */
+    private function attach(Model $model): Model
+    {
+        $model->attachRecord($this->database, $this->mapping);
+        return $model;
+    }
+    /** @return T|null */
+    public function first(): ?Model
+    {
+        $model = $this->page()->firstOrDefault();
+        return $model === null ? null : $this->attach($model);
+    }
+    /** Counts matching records before pagination, suitable for GraphQL meta.total. */
+    public function count(): int { return $this->set->count(); }
+    public function any(): bool { return $this->page()->any(); }
+    public function getIterator(): \Traversable
+    {
+        // Finish the database result before application code can issue nested queries/writes.
+        foreach ($this->page()->toArray() as $model) { yield $this->attach($model); }
+    }
+    public function cursor(): \Generator
+    {
+        foreach ($this->page() as $model) { yield $this->attach($model); }
+    }
+    public function toArray(): array { return iterator_to_array($this, false); }
+    public function asEnumerable(): IEnumerable { return Enumerable::from($this); }
+    public function sum(string $field): int|float|string { return $this->set->asQueryable()->sum($this->field($field)); }
+    public function avg(string $field): int|float|string|null { return $this->set->asQueryable()->average($this->field($field)); }
+    public function min(string $field): mixed { return $this->set->asQueryable()->min($this->field($field)); }
+    public function max(string $field): mixed { return $this->set->asQueryable()->max($this->field($field)); }
+    private function validateWrite(): void
+    {
+        if ($this->limit !== null || $this->offset !== 0) { throw new \LogicException('Bulk writes do not support pagination.'); }
+    }
+    public function update(array $values): int { $this->validateWrite(); return $this->set->executeUpdate($values); }
+    public function delete(): int { $this->validateWrite(); return $this->set->executeDelete(); }
+
+    private function field(string $name): ValueExpression
+    {
+        if (!in_array($name, $this->mapping->properties, true)) { throw new \InvalidArgumentException('Unknown column: '.$name); }
+        return Expr::field($name);
+    }
+    private function combine(array $parts, bool $and): ValueExpression
+    {
+        $result = array_shift($parts) ?? Expr::eq(Expr::value(1), $and ? 1 : 0);
+        foreach ($parts as $part) { $result = $and ? Expr::both($result,$part) : Expr::either($result,$part); }
+        return $result;
+    }
+    private function expression(array $filter): ValueExpression
+    {
+        $parts = [];
+        foreach ($filter as $name => $condition) {
+            if (in_array($name, ['_and','_or'], true)) {
+                if (!is_array($condition) || !array_is_list($condition)) { throw new \InvalidArgumentException('Logical groups require a list of condition maps.'); }
+                $parts[] = $this->combine(array_map(fn (array $f) => $this->expression($f), $condition), $name === '_and');
+                continue;
+            }
+            if ($name === '_not') {
+                if (!is_array($condition)) { throw new \InvalidArgumentException('_not requires a condition map.'); }
+                $parts[] = new NotExpression($this->expression($condition)); continue;
+            }
+            $field = $this->field((string)$name);
+            $conditions = is_array($condition) ? (array_is_list($condition) ? ['in'=>$condition] : $condition) : ['eq'=>$condition];
+            foreach ($conditions as $operator => $value) {
+                $operator = ltrim((string)$operator, '_');
+                $operator = $operator === 'ne' ? 'neq' : $operator;
+                if (in_array($operator,['eq','neq','gt','gte','lt','lte'], true)) {
+                    if ($value === null && !in_array($operator,['eq','neq'],true)) { throw new \InvalidArgumentException('Only equality accepts null.'); }
+                    $parts[] = Expr::$operator($field,$value);
+                } elseif (in_array($operator,['in','notIn'],true)) {
+                    if (!is_array($value) || !array_is_list($value)) { throw new \InvalidArgumentException('IN requires a value list.'); }
+                    $part = $this->combine(array_map(fn ($v) => Expr::eq($field,$v),$value), false);
+                    $parts[] = $operator === 'in' ? $part : new NotExpression($part);
+                } elseif (in_array($operator,['between','notBetween'],true)) {
+                    if (!is_array($value) || !array_is_list($value) || count($value)!==2) { throw new \InvalidArgumentException('Between requires two values.'); }
+                    $part = Expr::both(Expr::gte($field,$value[0]),Expr::lte($field,$value[1]));
+                    $parts[] = $operator === 'between' ? $part : new NotExpression($part);
+                } elseif (in_array($operator,['null','notNull'],true)) {
+                    if (!is_bool($value)) { throw new \InvalidArgumentException('Null tests require a boolean.'); }
+                    $parts[] = ($operator === 'null') === $value ? Expr::eq($field,null) : Expr::neq($field,null);
+                } elseif (in_array($operator,['like','contains','startsWith','endsWith'],true)) {
+                    if (!is_string($value)) { throw new \InvalidArgumentException('String filters require a string.'); }
+                    $pattern = $operator === 'like' ? $value : str_replace(['!','%','_'],['!!','!%','!_'],$value);
+                    if (in_array($operator,['contains','endsWith'],true)) { $pattern = '%'.$pattern; }
+                    if (in_array($operator,['contains','startsWith'],true)) { $pattern .= '%'; }
+                    $dialect = $this->database->connection()->getAttribute(\PDO::ATTR_DRIVER_NAME)==='mysql' ? new MySqlDialect() : new SqliteDialect();
+                    $parts[] = new RawSqlPredicateExpression($dialect->quoteIdentifier($name)." LIKE ? ESCAPE '!'",[$this->mapping->toProviderValue($name,$pattern)]);
+                } else { throw new \InvalidArgumentException('Unknown filter operator: '.$operator); }
+            }
+        }
+        return $this->combine($parts,true);
     }
 }

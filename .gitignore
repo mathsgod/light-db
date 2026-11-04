@@ -1,4 +1,4 @@
-vendor
-index.php
-.env
-.serena
+/vendor/
+/.phpunit.cache/
+/.phpstan.cache/
+/.env

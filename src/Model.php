@@ -1,538 +1,192 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Light\Db;
 
-use ArrayObject;
-use Exception;
-use JsonSerializable;
-use Laminas\Db\RowGateway\RowGateway;
-use Laminas\Db\Sql\Expression;
-use Laminas\Db\Sql\Predicate;
-use ReflectionClass;
-use ReflectionObject;
-use ReturnTypeWillChange;
+use Light\Entity\{Entity, EntityMapping, EntityState};
 
-abstract class Model extends RowGateway implements JsonSerializable
+/** Convention-based Active Record; hydration and persistence are provided by light-entity. */
+abstract class Model extends Entity
 {
-    protected $original = [];
-    protected $changed = [];
-
-    static function RegisterFilter(string $name, callable $callback)
-    {
-        Query::RegisterFilter(get_called_class(), $name, $callback);
-    }
-
-    static function RegisterOrder(string $name, callable $callback)
-    {
-        Query::RegisterOrder(get_called_class(), $name, $callback);
-    }
-
-    /**
-     * Boots the model once per process per class. Registers any filters /
-     * sorts declared via filterDefinitions() / orderDefinitions() into
-     * the Query registry. Subclasses do not need to call this directly —
-     * Query::__construct invokes it.
-     */
-    public static function boot(): void
-    {
-        $class = static::class;
-        if (isset(self::$booted[$class])) {
-            return;
-        }
-        self::$booted[$class] = true;
-
-        foreach (static::filterDefinitions() as $name => $callback) {
-            Query::RegisterFilter($class, $name, $callback);
-        }
-        foreach (static::orderDefinitions() as $name => $callback) {
-            Query::RegisterOrder($class, $name, $callback);
-        }
-    }
-
-    /**
-     * Returns filter callbacks declared by this model. Keys are filter
-     * names (as passed in ->filters([$name => $value])), values are
-     * callables compatible with Query::$Filters. Override in subclasses
-     * to declare relation-based or computed filters. Use parent:: to
-     * inherit the parent's definitions, e.g.:
-     *
-     *   return array_merge(parent::filterDefinitions(), [
-     *       'foo' => fn($v) => '...',
-     *   ]);
-     *
-     * To borrow another class's filter, call Other::filterDefinitions()['name'].
-     */
-    protected static function filterDefinitions(): array
-    {
-        return [];
-    }
-
-    /**
-     * Returns order callbacks declared by this model. Same contract as
-     * filterDefinitions() but for ->order([$name => $direction]).
-     */
-    protected static function orderDefinitions(): array
-    {
-        return [];
-    }
-
-    /**
-     * @var array<class-string, true>
-     */
+    private array $attributes = [];
+    private ?Database $owner = null;
+    private ?EntityMapping $mapping = null;
+    private array $original = [];
+    private bool $persisted = false;
+    private bool $deleted = false;
+    private static array $filters = [];
+    private static array $orders = [];
     private static array $booted = [];
 
-    static function Create(?array $data = []): static
+    final public function __construct(array $attributes = [])
     {
-
-        //reflector class
-        $ref_class = new ReflectionClass(static::class);
-
-        $table = self::_table();
-
-        $primaryKeys = $table->getPrimaryKey();
-
-        $obj = $ref_class->newInstance($primaryKeys, $table->getTable(), $table->adapter);
-
-        foreach ($table->columns() as $column) {
-            $obj->original[$column->getName()] = $column->getColumnDefault();
-        }
-
-        $obj->populate($data, false);
-
-        return $obj;
+        foreach ($attributes as $name => $value) { $this->assignAttribute($name, $value); }
     }
 
-    /**
-     * @param Where|string|int|array $where
-     * @return ?static
-     */
-    static function Get($where)
+    private function assignAttribute(string $name, mixed $value): void
     {
-        if ($where === null) {
-            return null;
-        }
-
-        if (is_numeric($where) || is_string($where)) {
-            $key = self::_table()->getPrimaryKey()[0];
-            $q = self::Query([$key => $where]);
+        $reflection = new \ReflectionObject($this);
+        if ($reflection->hasProperty($name) && $reflection->getProperty($name)->isPublic()) {
+            $reflection->getProperty($name)->setValue($this, $value);
         } else {
-            $q = self::Query($where);
+            $this->__set($name, $value);
         }
-
-        $obj = $q->first();
-        if ($obj) {
-            return $obj;
-        }
-        return null;
     }
 
-    public static function _table()
+    public function &__get(string $name): mixed
     {
-        $class = new \ReflectionClass(get_called_class());
-        $props = $class->getStaticProperties();
+        if (!array_key_exists($name, $this->attributes)) { $this->attributes[$name] = null; }
+        return $this->attributes[$name];
+    }
+    public function __set(string $name, mixed $value): void { $this->attributes[$name] = $value; }
+    public function __isset(string $name): bool { return isset($this->attributes[$name]); }
+    public function hasValue(string $name): bool { return array_key_exists($name, $this->attributes); }
+    public function jsonSerialize(): array { return array_replace($this->attributes, parent::jsonSerialize()); }
+    public function toArray(): array { return $this->jsonSerialize(); }
 
-        $table = $class->getShortName();
-        if (isset($props["_table"]))
-            $table = $props["_table"];
-
-
-        return static::GetAdapter()->getTable($table);
+    /** @return Query<static> */
+    public static function Query(\Light\Linq\Expression\ValueExpression|array $where = []): Query
+    {
+        $query = new Query(Database::getDefault(), static::class);
+        return $where === [] ? $query : $query->where($where);
     }
 
-    public function exchangeArray($array)
+    public static function Get(int|string|array|null $key): ?static
     {
-        $this->original = $array;
-        $r = parent::exchangeArray($array);
-        $this->data = [];
-        return $r;
+        if ($key === null) { return null; }
+        $query = static::Query();
+        if (!is_array($key)) {
+            $keys = Database::getDefault()->metadata(static::class)->keys;
+            if (count($keys) !== 1) { throw new \InvalidArgumentException('Composite keys require a named condition map.'); }
+            $key = [$keys[0] => $key];
+        }
+        if ($key === []) { throw new \InvalidArgumentException('Get() requires a key or non-empty condition map.'); }
+        return $query->where($key)->first();
     }
 
-    public function __debugInfo()
+    public static function Create(array $attributes = []): static
     {
-        return [
-            'original' => $this->original,
-            'data' => $this->data,
-            'changed' => $this->changed,
-        ];
+        $model = new static();
+        $database = Database::getDefault();
+        $model->attachRecord($database, $database->metadata(static::class), false);
+        $model->bind($attributes);
+        return $model;
     }
 
-    /**
-     * __get
-     *
-     * @param  string $name
-     * @throws Exception\InvalidArgumentException
-     * @return mixed
-     */
-    public function &__get($name)
+    public function bind(array $attributes): static
     {
-        $column = self::_table()->column($name);
-
-        if (!$column) {
-            //relation
-            $ro = new ReflectionObject($this);
-
-            $namespace = $ro->getNamespaceName();
-            if ($namespace == "") {
-                $class = $name;
-            } else {
-                $class = $namespace . "\\" . $name;
-                if (!class_exists($class)) {
-                    $class = $name;
-                }
-            }
-            if (!class_exists($class) || !is_subclass_of($class, Model::class)) {
-                $v = null;
-                return $v;
-            }
-
-
-            $key = static::_key();
-            $v = $class::Query([$key => $this->$key]);
-            return $v;
+        $mapping = $this->getMapping();
+        foreach ($attributes as $name => $value) {
+            if (!in_array($name, $mapping->properties, true)) { throw new \InvalidArgumentException('Unknown property: '.$name); }
         }
-
-        if ($column->getDataType() == "json") {
-            if (!array_key_exists($name, $this->data)) {
-                $this->data[$name] = $this->original[$name] !== null ? json_decode($this->original[$name], true) : null;
-            }
-            return $this->data[$name];
-        }
-
-        $data = array_merge($this->original, $this->data);
-        if ($column->getDataType() == "tinyint") {
-            $v = (bool) $data[$name];
-            return $v;
-        }
-
-
-        $v = $data[$name] ?? null;
-        return $v;
-    }
-
-    protected function getPrimaryKey()
-    {
-        return self::_table()->getPrimaryKey()[0];
-    }
-
-    public function save()
-    {
-        $keys = self::_table()->getPrimaryKey();
-        $table = self::_table();
-        $rowExists = $this->rowExistsInDatabase();
-
-        if ($rowExists) {
-            if (count($this->data) == 0 && count($this->changed) == 0) {
-                return true; // no changes, no need to save
-            }
-        }
-
-        foreach ($this->data as $name => $value) {
-            $column =  $table->column($name);
-            if (!$column) continue;
-
-            if ($column->isVirtualGenerated()) {
-                unset($this->data[$name]);
-                continue;
-            }
-
-            // On insert, treat null for a non-nullable column with a database
-            // default as omitted so the database can apply that default.
-            if (
-                !$rowExists
-                && $value === null
-                && !$column->isNullable()
-                && $column->getColumnDefault() !== null
-            ) {
-                unset($this->data[$name]);
-                continue;
-            }
-
-            if ($column->getDataType() == "json") {
-                $encoded = json_encode($value, JSON_UNESCAPED_UNICODE);
-                if ($encoded === false) {
-                    throw new \InvalidArgumentException(
-                        "Failed to encode value for JSON column '{$name}': " . json_last_error_msg()
-                    );
-                }
-                //compare to original data ,if not changed, skip
-                if ($this->original[$name] == $encoded) {
-                    unset($this->data[$name]);
-                    continue;
-                }
-
-                $this->data[$name] = $encoded;
-                continue;
-            }
-
-            if (is_array($value)) {
-                $this->data[$name] = implode(",", $value);
-                continue;
-            }
-
-            if ($column->getDataType() == "int" && $value === "") {
-                if ($column->isNullable()) {
-                    $this->data[$name] = null;
-                    continue;
-                }
-            }
-
-            if ($column->getDataType() == "int" && !$column->isNullable()) {
-
-                if ($value === "" || is_null($value)) {
-                    $this->data[$name] = 0;
-                    continue;
-                }
-            }
-        }
-
-
-        foreach ($keys as $key) {
-            if (!array_key_exists($key, $this->data)) {
-                $this->data[$key] = $this->original[$key];
-            }
-        }
-
-        foreach ($table->columns() as $column) {
-            $colName = $column->getName();
-            if (in_array($colName, $keys)) continue;
-
-            if (!$column->isNullable()) {
-                if (array_key_exists($colName, $this->data)) {
-                    if ($this->data[$colName] === null && !$column->getColumnDefault()) {
-                        if (in_array($column->getDataType(), ["int", "tinyint", "smallint", "mediumint", "bigint"])) {
-                            $this->data[$colName] = 0;
-                        } else {
-                            $this->data[$colName] = "";
-                        }
-                    }
-                } else {
-                    $primaryKeyValues = [];
-                    foreach ($keys as $key) {
-                        $primaryKeyValues[] = $this->data[$key] ?? $this->original[$key] ?? null;
-                    }
-                    $hasRealPrimaryKey = count(array_filter($primaryKeyValues, fn($v) => $v !== null)) > 0;
-
-                    if (!$hasRealPrimaryKey) { // 如果沒有主鍵，則不需要檢查
-                        if ($column->getColumnDefault() === null) {
-                            if (in_array($column->getDataType(), ["int", "tinyint", "smallint", "mediumint", "bigint"])) {
-                                $this->data[$colName] = 0;
-                            } else {
-                                $this->data[$colName] = "";
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // When inserting a row with a composite primary key that contains an
-        // auto-increment column, Laminas RowGateway cannot refresh the row
-        // because it only uses the generated value when there is exactly one PK
-        // column. Temporarily narrow the PK to the auto-increment column for the
-        // insert, then restore the full composite key afterwards.
-        $autoIncrementKeys = [];
-        foreach ($table->columns() as $column) {
-            if ($column->isAutoIncrement()) {
-                $autoIncrementKeys[] = $column->getName();
-            }
-        }
-
-        $isCompositeAutoIncrementInsert = !$rowExists
-            && count($keys) > 1
-            && count($autoIncrementKeys) > 0;
-
-        $originalPrimaryKeyColumn = $this->primaryKeyColumn;
-
-        if ($isCompositeAutoIncrementInsert) {
-            $this->primaryKeyColumn = $autoIncrementKeys;
-        }
-
-        try {
-            $this->changed = $this->data;
-            $result = parent::save();
-            $this->original = $this->data;
-            $this->data = [];
-        } finally {
-            if ($isCompositeAutoIncrementInsert) {
-                $this->primaryKeyColumn = $originalPrimaryKeyColumn;
-
-                if ($this->rowExistsInDatabase()) {
-                    foreach ($keys as $key) {
-                        if (!in_array($key, $autoIncrementKeys, true)) {
-                            $this->primaryKeyData[$key] = $this->original[$key] ?? null;
-                        }
-                    }
-                }
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return Query<static> & iterable<static>
-     * @param Where|\Closure|string|array|Predicate\PredicateInterface $predicate
-     */
-    static function Query($predicate = null, $combination = Predicate\PredicateSet::OP_AND)
-    {
-        $table = self::_table();
-        $query = new Query(static::class, $table);
-        if ($predicate) {
-            $query->where($predicate, $combination);
-        }
-        return $query;
-    }
-
-    /**
-     * @var Adapter
-     */
-    protected static $_adapter = null;
-
-    public static function SetAdapter(Adapter $adapter)
-    {
-        self::$_adapter = $adapter;
-    }
-
-    public static function GetAdapter(): Adapter
-    {
-        if (self::$_adapter == null) {
-            self::$_adapter = Adapter::Create();
-        }
-        return self::$_adapter;
-    }
-
-    function wasChanged(?string $name = null): bool
-    {
-        if (is_null($name)) {
-            return count($this->changed) > 0;
-        }
-        return array_key_exists($name, $this->changed);
-    }
-
-
-    function isDirty(?string $name = null): bool
-    {
-        if (is_null($name)) {
-            return count($this->getDirty()) > 0;
-        }
-
-        return isset($this->data[$name]);
-    }
-
-    function getDirty(): array
-    {
-        return $this->data;
-    }
-
-    function _id()
-    {
-        return $this->{$this->primaryKeyColumn[0]};
-    }
-
-    /**
-     * get the primary key of the model,
-     * if the model has no primary key, return null,
-     * if the model has multiple primary keys, return an array
-     * @return string|array|null
-     */
-    static function _key()
-    {
-        $primaryKey = self::_table()->getPrimaryKey();
-        return $primaryKey[0] ?? null;
-    }
-
-    // get the attributes of the model
-    static function __attribute(?string $name = null)
-    {
-        if ($name) {
-            return self::_table()->column($name);
-        }
-
-        return self::__attributes();
-    }
-
-    static function __attributes()
-    {
-        return self::_table()->columns()->all();
-    }
-
-    function __call($class_name, $args)
-    {
-        $ro = new ReflectionObject($this);
-
-        $namespace = $ro->getNamespaceName();
-        if ($namespace == "") {
-            $class = $class_name;
-        } else {
-            $class = $namespace . "\\" . $class_name;
-            if (!class_exists($class)) {
-                $class = $class_name;
-            }
-        }
-
-        if (!class_exists($class) || !is_subclass_of($class, Model::class)) {
-            throw new Exception($class . " class not found");
-        }
-
-        $key = forward_static_call(array($class, "_key"));
-        if (self::_table()->column($key)) {
-            $id = $this->$key;
-            if (!$id) return null;
-            return $class::Get($this->$key);
-        }
-
-        $key = static::_key();
-        $q = $class::Query([$key => $this->$key]);
-        $q->where($args);
-
-        return new ArrayObject($q->toArray());
-    }
-
-
-    /**
-     * @deprecated use populate instead
-     */
-    function bind($rs)
-    {
-        if (is_object($rs)) { // convert to array
-            $rs = (array)$rs;
-        }
-        $this->data = array_merge($this->data, $rs);
+        foreach ($attributes as $name => $value) { $this->assignAttribute($name, $value); }
         return $this;
     }
 
-    #[ReturnTypeWillChange]
-    function jsonSerialize(): mixed
+    /** @internal Query attaches metadata after light-entity directly hydrates this Model class. */
+    public function attachRecord(Database $database, EntityMapping $mapping, bool $persisted = true): void
     {
-        $data = $this->original;
-        foreach ($this->_table()->columns() as $column) {
-            $name = $column->getName();
-            if ($column->getDataType() == "json") {
-                if ($this->original[$name] == null) {
-                    $data[$name] = null;
-                } else {
-                    $data[$name] = json_decode($this->original[$name], true);
-                }
-
-                continue;
-            }
-        }
-
-        return array_merge($data, $this->data);
+        $this->owner = $database; $this->mapping = $mapping; $this->persisted = $persisted;
+        $this->original = $persisted ? $mapping->snapshotValues($mapping->values($this)) : [];
     }
 
-    public function toArray()
+    private function getMapping(): EntityMapping
     {
-        return $this->jsonSerialize();
+        $this->owner ??= Database::getDefault();
+        return $this->mapping ??= $this->owner->metadata(static::class);
     }
 
-    public function __isset($key)
+    /** A private working copy gives the native tracker an original baseline without mutating this Model. */
+    private function prepareWrite(): array
     {
-        $column = self::_table()->column($key);
-        if ($column) {
-            return true;
+        $mapping = $this->getMapping();
+        $context = $this->owner->writeContext($mapping);
+        $copy = clone $this;
+        if ($this->persisted) {
+            $current = $mapping->snapshotValues($mapping->values($this));
+            foreach ($mapping->snapshotValues($this->original) as $name => $value) { $copy->assignAttribute($name, $value); }
+            $context->entry($copy)->state = EntityState::Unchanged;
+            foreach ($current as $name => $value) { $copy->assignAttribute($name, $value); }
         }
+        return [$context, $copy, $mapping];
+    }
 
+    public function save(): int
+    {
+        if ($this->deleted) { throw new \LogicException('A deleted Model cannot be saved again.'); }
+        [$context, $copy, $mapping] = $this->prepareWrite();
+        try {
+            if (!$this->persisted) { $context->add(static::class, $copy); }
+            $count = $context->saveChanges();
+        } finally {
+            $context->entry($copy)->state = EntityState::Detached;
+        }
+        foreach ($mapping->values($copy) as $name => $value) { $this->assignAttribute($name, $value); }
+        $this->persisted = true;
+        $this->original = $mapping->snapshotValues($mapping->values($this));
+        return $count;
+    }
+
+    public function delete(): int
+    {
+        if (!$this->persisted || $this->deleted) { return 0; }
+        [$context, $copy] = $this->prepareWrite();
+        try {
+            $context->remove(static::class, $copy);
+            $count = $context->saveChanges();
+        } finally {
+            $context->entry($copy)->state = EntityState::Detached;
+        }
+        $this->persisted = false; $this->deleted = true;
+        return $count;
+    }
+
+    public function exists(): bool { return $this->persisted && !$this->deleted; }
+    public function isDirty(?string $property = null): bool
+    {
+        $mapping = $this->getMapping(); $current = $mapping->values($this);
+        if ($property !== null) {
+            if (!array_key_exists($property, $current)) { throw new \InvalidArgumentException('Unknown property: '.$property); }
+            return !$mapping->propertyEquals($property, $current[$property], $this->original[$property] ?? null);
+        }
+        if ($this->persisted) { return !$mapping->valuesEqual($current, $this->original); }
+        if ($this->attributes !== []) { return true; }
+        foreach ($current as $value) { if ($value !== null) { return true; } }
         return false;
+    }
+
+    public static function _key(): string|array
+    {
+        $keys = Database::getDefault()->metadata(static::class)->keys;
+        return count($keys) === 1 ? $keys[0] : $keys;
+    }
+    public function _id(): int|string|array|null
+    {
+        $mapping = $this->getMapping();
+        if (count($mapping->keys) === 1) { return $mapping->values($this)[$mapping->keys[0]]; }
+        return array_intersect_key($mapping->values($this), array_flip($mapping->keys));
+    }
+
+    public static function valueConverters(): array { return []; }
+    public static function valueComparers(): array { return []; }
+    protected static function filterDefinitions(): array { return []; }
+    protected static function orderDefinitions(): array { return []; }
+    public static function RegisterFilter(string $name, callable $callback): void { self::$filters[static::class][$name] = $callback; }
+    public static function RegisterOrder(string $name, callable $callback): void { self::$orders[static::class][$name] = $callback; }
+
+    /** @internal */
+    public static function registered(string $kind, string $name): ?callable
+    {
+        if (!isset(self::$booted[static::class])) {
+            foreach (static::filterDefinitions() as $key => $callback) { static::RegisterFilter($key, $callback); }
+            foreach (static::orderDefinitions() as $key => $callback) { static::RegisterOrder($key, $callback); }
+            self::$booted[static::class] = true;
+        }
+        $registry = $kind === 'filter' ? self::$filters : self::$orders;
+        for ($class = static::class; $class; $class = get_parent_class($class)) {
+            if (isset($registry[$class][$name])) { return $registry[$class][$name]; }
+        }
+        return null;
     }
 }
