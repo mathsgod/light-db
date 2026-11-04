@@ -9,7 +9,6 @@ use Light\Entity\{Entity, EntityMapping, EntityState};
 /** Convention-based Active Record; hydration and persistence are provided by light-entity. */
 abstract class Model extends Entity
 {
-    private array $attributes = [];
     private ?Database $owner = null;
     private ?EntityMapping $mapping = null;
     private array $original = [];
@@ -18,64 +17,12 @@ abstract class Model extends Entity
     private static array $filters = [];
     private static array $orders = [];
     private static array $booted = [];
-    /** @var array<class-string, array{properties:list<\ReflectionProperty>, simple:bool, dynamic:bool}> */
-    private static array $propertyMetadata = [];
 
     final public function __construct(array $attributes = [])
     {
-        foreach ($attributes as $name => $value) { $this->assignAttribute($name, $value); }
+        if ($attributes !== []) { $this->bind($attributes); }
     }
 
-    private function assignAttribute(string $name, mixed $value): void
-    {
-        $reflection = new \ReflectionObject($this);
-        if ($reflection->hasProperty($name) && $reflection->getProperty($name)->isPublic()) {
-            $reflection->getProperty($name)->setValue($this, $value);
-        } else {
-            $this->__set($name, $value);
-        }
-    }
-
-    public function &__get(string $name): mixed
-    {
-        if (!array_key_exists($name, $this->attributes)) { $this->attributes[$name] = null; }
-        return $this->attributes[$name];
-    }
-    public function __set(string $name, mixed $value): void { $this->attributes[$name] = $value; }
-    public function __isset(string $name): bool { return isset($this->attributes[$name]); }
-    public function hasValue(string $name): bool { return array_key_exists($name, $this->attributes); }
-    private static function propertyMetadata(): array
-    {
-        if (isset(self::$propertyMetadata[static::class])) { return self::$propertyMetadata[static::class]; }
-        $reflection = new \ReflectionClass(static::class);
-        $properties = [];
-        foreach ($reflection->getProperties(\ReflectionProperty::IS_PUBLIC) as $property) {
-            if (!$property->isStatic() && !(PHP_VERSION_ID >= 80400 && $property->isVirtual())) { $properties[] = $property; }
-        }
-        $customSetter = $reflection->getMethod('__set')->getDeclaringClass()->getName() !== self::class;
-        $customGetter = $reflection->getMethod('__get')->getDeclaringClass()->getName() !== self::class;
-        $customIsset = $reflection->getMethod('__isset')->getDeclaringClass()->getName() !== self::class;
-        $dynamic = $customSetter;
-        for ($type = $reflection; $type !== false; $type = $type->getParentClass()) {
-            if ($type->getAttributes(\AllowDynamicProperties::class) !== []) { $dynamic = true; break; }
-        }
-        return self::$propertyMetadata[static::class] = [
-            'properties'=>$properties, 'simple'=>$properties === [] && !$customSetter && !$customGetter && !$customIsset && !$dynamic, 'dynamic'=>$dynamic,
-        ];
-    }
-
-    public function jsonSerialize(): array
-    {
-        $metadata = self::propertyMetadata();
-        if ($metadata['dynamic']) { return array_replace($this->attributes, parent::jsonSerialize()); }
-        $values = $this->attributes;
-        foreach ($metadata['properties'] as $property) {
-            if ($property->isInitialized($this)) {
-                $values[$property->getName()] = PHP_VERSION_ID >= 80400 ? $property->getRawValue($this) : $property->getValue($this);
-            }
-        }
-        return $values;
-    }
     public function toArray(): array { return $this->jsonSerialize(); }
 
     /** @return Query<static> */
@@ -109,11 +56,7 @@ abstract class Model extends Entity
 
     public function bind(array $attributes): static
     {
-        $mapping = $this->getMapping();
-        foreach ($attributes as $name => $value) {
-            if (!in_array($name, $mapping->properties, true)) { throw new \InvalidArgumentException('Unknown property: '.$name); }
-        }
-        foreach ($attributes as $name => $value) { $this->assignAttribute($name, $value); }
+        $this->getMapping()->applyValues($this, $attributes);
         return $this;
     }
 
@@ -121,10 +64,7 @@ abstract class Model extends Entity
     public function attachRecord(Database $database, EntityMapping $mapping, bool $persisted = true): void
     {
         $this->owner = $database; $this->mapping = $mapping; $this->persisted = $persisted;
-        if (!$persisted) { $this->original = []; return; }
-        $this->original = self::propertyMetadata()['simple']
-            ? ($mapping->comparers === [] && $mapping->converters === [] ? $this->attributes : ModelMetadata::snapshotHydrated($mapping, $this->attributes, $this))
-            : $mapping->snapshotValues($mapping->values($this));
+        $this->original = $persisted ? $mapping->snapshotEntity($this, fromProvider: true) : [];
     }
 
     private function getMapping(): EntityMapping
@@ -133,46 +73,36 @@ abstract class Model extends Entity
         return $this->mapping ??= $this->owner->metadata(static::class);
     }
 
-    /** A private working copy gives the native tracker an original baseline without mutating this Model. */
-    private function prepareWrite(): array
-    {
-        $mapping = $this->getMapping();
-        $context = $this->owner->writeContext($mapping);
-        $copy = clone $this;
-        if ($this->persisted) {
-            $current = $mapping->snapshotValues($mapping->values($this));
-            foreach ($mapping->snapshotValues($this->original) as $name => $value) { $copy->assignAttribute($name, $value); }
-            $context->entry($copy)->state = EntityState::Unchanged;
-            foreach ($current as $name => $value) { $copy->assignAttribute($name, $value); }
-        }
-        return [$context, $copy, $mapping];
-    }
-
     public function save(): int
     {
         if ($this->deleted) { throw new \LogicException('A deleted Model cannot be saved again.'); }
-        [$context, $copy, $mapping] = $this->prepareWrite();
+        $mapping = $this->getMapping();
+        $context = $this->owner->writeContext($mapping);
         try {
-            if (!$this->persisted) { $context->add(static::class, $copy); }
+            if ($this->persisted) { $context->attach($this, $this->original); }
+            else { $context->add(static::class, $this); }
             $count = $context->saveChanges();
         } finally {
-            $context->entry($copy)->state = EntityState::Detached;
+            $context->entry($this)->state = EntityState::Detached;
+            $this->attachRelations($context, $mapping, \Light\Entity\QueryTrackingBehavior::NoTracking);
         }
-        foreach ($mapping->values($copy) as $name => $value) { $this->assignAttribute($name, $value); }
         $this->persisted = true;
-        $this->original = $mapping->snapshotValues($mapping->values($this));
+        $this->original = $mapping->snapshotEntity($this);
         return $count;
     }
 
     public function delete(): int
     {
         if (!$this->persisted || $this->deleted) { return 0; }
-        [$context, $copy] = $this->prepareWrite();
+        $mapping = $this->getMapping();
+        $context = $this->owner->writeContext($mapping);
         try {
-            $context->remove(static::class, $copy);
+            $context->attach($this, $this->original);
+            $context->remove(static::class, $this);
             $count = $context->saveChanges();
         } finally {
-            $context->entry($copy)->state = EntityState::Detached;
+            $context->entry($this)->state = EntityState::Detached;
+            $this->attachRelations($context, $mapping, \Light\Entity\QueryTrackingBehavior::NoTracking);
         }
         $this->persisted = false; $this->deleted = true;
         return $count;
@@ -187,7 +117,7 @@ abstract class Model extends Entity
             return !$mapping->propertyEquals($property, $current[$property], $this->original[$property] ?? null);
         }
         if ($this->persisted) { return !$mapping->valuesEqual($current, $this->original); }
-        if ($this->attributes !== []) { return true; }
+        if ($this->storedValues() !== []) { return true; }
         foreach ($current as $value) { if ($value !== null) { return true; } }
         return false;
     }

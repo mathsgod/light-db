@@ -43,7 +43,7 @@ if ($action==='seed') {
 }
 if ($action!=='worker') { throw new InvalidArgumentException('Use seed or worker.'); }
 [$variant,$mode,$workload]=[$argv[2],$argv[3],$argv[4]];
-if (!in_array($variant,['old','baseline','new'],true) || !in_array($mode,['cold','warm'],true) || !in_array($workload,['plain','json'],true)) {
+if (!in_array($variant,['old','baseline','new','entity','entity-no-tracking','profile'],true) || !in_array($mode,['cold','warm'],true) || !in_array($workload,['plain','json'],true)) {
     throw new InvalidArgumentException('Invalid worker arguments.');
 }
 $newRoot=dirname(__DIR__,2);
@@ -72,15 +72,36 @@ if ($variant==='old') {
     User::SetAdapter(new Light\Db\Adapter(new Laminas\Db\Adapter\Driver\Pdo\Pdo($pdo)));
 } else { Light\Db\Database::setDefault(new Light\Db\Database($pdo)); }
 User::useTable('bench_'.$workload.'_users');
+$context = null;
+$profile = [];
+$fetch = static function () use ($variant, $pdo, &$context, &$profile): array {
+    if ($variant === 'profile') {
+        $start = hrtime(true);
+        $database = \Light\Db\Database::getDefault();
+        $mapping = $database->metadata(User::class);
+        $set = $database->set(User::class);
+        $prepared = hrtime(true);
+        $models = $set->toArray();
+        $hydrated = hrtime(true);
+        foreach ($models as $model) { $model->attachRecord($database, $mapping); }
+        $attached = hrtime(true);
+        $profile = ['setup_ms'=>($prepared-$start)/1e6, 'materialize_ms'=>($hydrated-$prepared)/1e6, 'attach_snapshot_ms'=>($attached-$hydrated)/1e6];
+        return $models;
+    }
+    if (!str_starts_with($variant, 'entity')) { return User::Query()->toArray(); }
+    $context ??= new \Light\Entity\DbContext($pdo, mappings: [\Light\Db\Database::getDefault()->metadata(User::class)]);
+    $set = $context->set(User::class);
+    return ($variant === 'entity-no-tracking' ? $set->asNoTracking() : $set)->toArray();
+};
 if ($mode==='warm') {
-    $warm=User::Query()->toArray(); $warmJson=json_encode($warm,JSON_THROW_ON_ERROR);
-    unset($warmJson,$warm); gc_collect_cycles();
+    $warm=$fetch(); $warmJson=json_encode($warm,JSON_THROW_ON_ERROR);
+    unset($warmJson,$warm); if ($context !== null) { foreach ($context->changeTracker->entries() as $entry) { $entry->state = \Light\Entity\EntityState::Detached; } unset($entry); } gc_collect_cycles();
 }
 $pdo->calls=0;
 memory_reset_peak_usage();
 $before=memory_get_usage(false);
 $start=hrtime(true);
-$rows=User::Query()->toArray();
+$rows=$fetch();
 $fetched=hrtime(true);
 $json=json_encode($rows,JSON_THROW_ON_ERROR);
 $done=hrtime(true);
@@ -104,4 +125,4 @@ foreach ($data as $i=>$row) {
 echo json_encode(['variant'=>$variant,'mode'=>$mode,'workload'=>$workload,'rows'=>count($rows),
     'total_ms'=>($done-$start)/1e6,'fetch_ms'=>($fetched-$start)/1e6,'json_ms'=>($done-$fetched)/1e6,
     'retained_bytes'=>$memory,'peak_bytes'=>$peak,'sql_calls'=>$sqlCalls,
-    'json_bytes'=>strlen($json),'checksum'=>hash('sha256',$json)],JSON_THROW_ON_ERROR),"\n";
+    'profile'=>$profile,'json_bytes'=>strlen($json),'checksum'=>hash('sha256',$json)],JSON_THROW_ON_ERROR),"\n";

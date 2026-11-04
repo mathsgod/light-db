@@ -117,8 +117,8 @@ ordinary mapped-column conditions.
 
 Each Model save/delete uses its own light-entity unit of work and automatic
 transaction, preserving the original snapshot and caller's object on failure.
-The tracker receives an internal working copy; successful database-generated
-values are copied back to the original Model. Saving one Model never flushes
+The tracker attaches the actual Model with its original model-value snapshot;
+no working clone or attribute reassignment is required. Saving one Model never flushes
 another Model's unsaved changes. Primary-key and computed-column modifications
 are rejected. Deleted Models cannot be saved again. `exists()`, `isDirty()`,
 `toArray()`, `_id()` and `_key()` provide basic Model introspection.
@@ -134,13 +134,15 @@ The old Laminas Query/Predicate API is intentionally not emulated.
 
 For conventional dynamic Models, hydration already produces validated model
 attributes. The original snapshot reuses that array with PHP copy-on-write,
-avoiding a second per-column read/validation pass. The standard JSON decoder
+avoiding repeated magic-property reads while retaining model-value validation. The standard JSON decoder
 produces arrays/scalars without references, so its hydrated snapshot can also
 share storage until mutation rather than immediately encode/decode a second
 copy. This optimization does not apply to custom converters or magic accessors;
 the general validation/comparer path is retained for them and public typed
 properties. Save-time snapshots keep their existing comparer behavior.
 
+Entity owns dynamic attribute storage and reference access. Model delegates bulk
+assignment and snapshots to EntityMapping, and directly attaches itself on save.
 JSON serialization caches public-property metadata per class and reads values
 per instance. Dynamic/custom-setter cases retain the generic serialization path.
 `Query::toArray()` attaches Models directly to the materialized array rather

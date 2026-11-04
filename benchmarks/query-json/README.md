@@ -69,3 +69,102 @@ Optimizations: reuse normalized attributes for plain dynamic Model snapshots, sh
 Versus v1, warm totals are now similar in these fixtures. JSON peak memory remains higher than v1 (20.189 vs 17.155 MiB) because v2 retains decoded JSON data on Models; the plain fixture uses less memory (12.003 vs 15.606 MiB). The JSON warm paired delta (new minus v1) has a bootstrap 95% interval crossing zero, so this run does not establish a stable JSON speed advantage over v1. It establishes a large improvement over the initial v2 implementation.
 
 Validation: SQLite and MySQL each pass 21 tests / 132 assertions; PHPStan level 5 passes. Timed SQL calls remain one per warm query. No application database or production checkout was swapped. Raw samples and paired comparisons are in `results-ab-10000.json` (gitignored).
+
+## Entity storage refactor — 2026-11-04
+
+Reproduce with `python3 benchmarks/query-json/run.py 30 10000 5cc2226 9b6ecea`.
+The baseline is the previously optimized v2 Model. All variants use the same
+local light-entity dependency; this comparison isolates the Model adapter change.
+All 360 workers produced identical final JSON within each fixture.
+
+| Fixture | Mode | v1 ms | Previous v2 ms | Refactored v2 ms | Previous/refactored peak MiB |
+| --- | --- | ---: | ---: | ---: | ---: |
+| plain | cold | 75.646 | 66.937 | 71.312 | 13.118 / 13.042 |
+| plain | warm | 53.607 | 50.878 | 57.142 | 12.003 / 12.003 |
+| json | cold | 95.467 | 89.017 | 95.088 | 21.240 / 21.240 |
+| json | warm | 74.937 | 78.430 | 82.026 | 20.189 / 20.189 |
+
+The refactor removes Model-owned attribute storage and clone/reassignment on
+save. EntityMapping now validates model values and builds snapshots. This
+adds read-path work compared with the former adapter shortcut; timings above
+show the measured cost rather than a speed improvement. Default JSON snapshots
+keep copy-on-write storage without assigning unchanged values into the array.
+Warm queries still execute one SQL statement.
+
+## Direct light-entity comparison — 2026-11-04
+
+Run `python3 benchmarks/query-json/run-entity.py 30 10000`. The same User
+class, schema mapping, JSON converter and PDO connection configuration are used
+to isolate adapter overhead. Direct queries bypass Model attachRecord/snapshots;
+they do not initialize Active Record persistence state. These figures do not
+measure a separately optimized plain Entity class. No-tracking cases have 30
+fresh-process rounds each; warm means schema/query initialization has run once.
+Tracked queries have just one cold observation per fixture because they are
+currently expensive. All complete JSON outputs match within each fixture.
+
+| Fixture | Warm API | Query/toArray median ms | Including JSON median ms |
+| --- | --- | ---: | ---: |
+| plain | new | 47.474 | 55.461 |
+| plain | entity-no-tracking | 39.672 | 49.843 |
+| json | new | 68.729 | 80.677 |
+| json | entity-no-tracking | 52.236 | 68.255 |
+
+Default tracked `set(User::class)->toArray()` cold observations:
+
+- plain: 28.455 s query, 28.465 s including JSON.
+- json: 37.429 s query, 37.443 s including JSON.
+
+The current ChangeTracker performs linear identity scans while adding each
+entity, producing quadratic work across a large result. No-tracking bypasses
+this. No-tracking light-db additionally captures the original snapshot and
+attaches its Database/mapping so Models can later save independently.
+Raw measurements: `results-entity-10000.json` (gitignored).
+
+## 100-record bottleneck investigation — 2026-11-04
+
+Run `python3 benchmarks/query-json/run.py 50 100 5cc2226` for v1 vs current
+v2 (50 randomized rounds; 400 independent workers). Also run
+`python3 benchmarks/query-json/run-entity.py 30 100` for direct no-tracking
+queries and stage timings. All complete JSON outputs match per fixture.
+Connection/autoload bootstrap are excluded; cold still includes first use of
+query classes and schema discovery. Warm SQL calls remain one.
+
+Two hydration barriers caused unnecessary work: the streaming iterator was also
+used to materialize `DbSet::toArray()`, bypassing native bulk hydration; the bulk
+eligibility gate also excluded every Model constructor and all value converters.
+Bulk materialization now skips constructors, applies converters once to raw
+provider values, and initializes dynamic Entity storage in one operation.
+Streaming iteration and general typed/custom-setter/raw SQL paths are preserved.
+Snapshot processing now visits only configured comparers.
+
+| Fixture | Mode | v1 query ms | v2 query ms | v1 including JSON ms | v2 including JSON ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| plain | cold | 17.174 | 8.408 | 19.511 | 8.481 |
+| plain | warm | 1.084 | 0.951 | 1.326 | 1.013 |
+| json | cold | 17.172 | 8.529 | 19.681 | 8.629 |
+| json | warm | 1.110 | 1.239 | 1.451 | 1.319 |
+
+Warm SELECT → JSON time is 23.6% lower for plain fields and 9.1% lower with
+JSON. Paired round-delta bootstrap 95% intervals (5,000 resamples, seed 42)
+are [-0.377, -0.260] ms and [-0.268, -0.135] ms respectively; both favor v2.
+Before these changes, a separate sequential 50-round run measured v2 warm totals
+of 1.349 ms (plain) and 1.574 ms (JSON). These separate runs are not paired A/B.
+
+JSON query-only still costs more than v1: the v1 Model decodes JSON lazily on
+access/serialization, whereas v2 converters decode during hydration. Complete
+JSON output measures both implementations doing that work. This is not a claim
+that every Query workload is faster.
+
+The stage profiler reproduces the no-filter pipeline with clocks around setup,
+native set materialization and Model attach/snapshot. It omits Query wrapper
+construction and is a separate run, so medians must not be subtracted from the
+v1 comparison. Stage medians (100 rows):
+
+| Fixture | Setup ms | SQL + hydration ms | Model attach/snapshot ms |
+| --- | ---: | ---: | ---: |
+| plain | 0.007 | 0.931 | 0.058 |
+| json | 0.007 | 1.064 | 0.086 |
+
+Raw results: `results-100.json`, `results-before-100.json` and
+`results-entity-100.json` (gitignored). These record working-tree source hashes;
+no performance fix has been committed automatically.
