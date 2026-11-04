@@ -113,6 +113,26 @@ may override protected `filterDefinitions()` and `orderDefinitions()` instead.
 Custom named filters are applied at the top level; nested logical groups accept
 ordinary mapped-column conditions.
 
+## Read-only queries
+
+```php
+$users = User::Query()->asReadOnly()->where(['age'=>['gte'=>18]])->toArray();
+echo json_encode($users, JSON_THROW_ON_ERROR);
+```
+
+`asReadOnly()` returns a new Query. It keeps converters and User instances but
+skips Model original snapshots. It applies to `first()`, `toArray()`, buffered
+iteration and `cursor()`, including further filters/orders/pagination. Custom
+callbacks returning another Query cannot remove an existing read-only flag.
+Normal queries keep their existing persistence behavior.
+
+Read-only Models report `isReadOnly() === true`; their fields remain mutable for
+presentation. Model `save()`/`delete()` and Query `update()`/`delete()` throw
+LogicException. `isDirty()` also throws because there is no original baseline.
+`exists()`, `_id()`, `toArray()` and JSON serialization remain available.
+This is an API persistence restriction; independent raw SQL or another query on
+the same database is outside its scope.
+
 ## Persistence boundaries
 
 Each Model save/delete uses its own light-entity unit of work and automatic

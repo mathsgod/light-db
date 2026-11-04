@@ -17,12 +17,19 @@ final class Query implements \IteratorAggregate, \Countable
     private ?int $limit = null;
     private int $offset = 0;
     private bool $ordered = false;
+    private bool $readOnly = false;
 
     /** @param class-string<T> $class */
     public function __construct(private readonly Database $database, private readonly string $class)
     {
         $this->mapping = $database->metadata($class);
         $this->set = $database->set($class);
+    }
+
+    /** Skip Model snapshots and prohibit persistence through this query and its results. @return self<T> */
+    public function asReadOnly(): self
+    {
+        $copy = clone $this; $copy->readOnly = true; return $copy;
     }
 
     public function getClassName(): string { return $this->class; }
@@ -61,7 +68,7 @@ final class Query implements \IteratorAggregate, \Countable
         if ($query->database !== $this->database || $query->class !== $this->class) {
             throw new \LogicException('A registered callback must return a query for the same Model and Database.');
         }
-        return $query;
+        return $this->readOnly ? $query->asReadOnly() : $query;
     }
 
     /** @return self<T> */
@@ -122,7 +129,7 @@ final class Query implements \IteratorAggregate, \Countable
     /** @param T $model @return T */
     private function attach(Model $model): Model
     {
-        $model->attachRecord($this->database, $this->mapping);
+        $model->attachRecord($this->database, $this->mapping, readOnly: $this->readOnly);
         return $model;
     }
     /** @return T|null */
@@ -156,6 +163,7 @@ final class Query implements \IteratorAggregate, \Countable
     public function max(string $field): mixed { return $this->set->asQueryable()->max($this->field($field)); }
     private function validateWrite(): void
     {
+        if ($this->readOnly) { throw new \LogicException('A read-only Query cannot update or delete records.'); }
         if ($this->limit !== null || $this->offset !== 0) { throw new \LogicException('Bulk writes do not support pagination.'); }
     }
     public function update(array $values): int { $this->validateWrite(); return $this->set->executeUpdate($values); }

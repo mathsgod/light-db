@@ -18,6 +18,8 @@ rows=int(sys.argv[2]) if len(sys.argv)>2 else 10000
 old_ref=sys.argv[3] if len(sys.argv)>3 else 'main'
 baseline_ref=sys.argv[4] if len(sys.argv)>4 else None
 variants=['old','baseline','new'] if baseline_ref else ['old','new']
+readonly_bench=os.environ.get('READ_ONLY_BENCH')=='1'
+if readonly_bench: variants=['old','new','readonly']
 if rounds<3 or not 1<=rows<=1000000: raise SystemExit('Use >=3 rounds and 1..1000000 rows')
 env=dict(os.environ,BENCH_ROWS=str(rows),LIGHT_DB_OLD_ROOT=str(old))
 env.setdefault('LIGHT_DB_QUERY_BENCH_PORT','33391')
@@ -74,7 +76,7 @@ try:
         new_source_sha256={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((root/'src').glob('*.php'))},
         notes='Query()->toArray() then json_encode Models. Plain and JSON-column fixtures. Connection/autoload excluded. Fresh processes, CLI OPcache off; warm fully queries/serializes once before timing. v1 source archived from Git, no production checkout modifications. SQL counters include metadata. No writes timed.',
         summary=summary,samples=samples)
-    output=bench/(f'results-ab-{rows}.json' if baseline_ref else f'results-{rows}.json')
+    output=bench/(f'results-readonly-{rows}.json' if readonly_bench else (f'results-ab-{rows}.json' if baseline_ref else f'results-{rows}.json'))
     output.write_text(json.dumps(result,indent=2)+'\n')
     print(f'Results: {output}',flush=True)
 finally:

@@ -14,6 +14,7 @@ abstract class Model extends Entity
     private array $original = [];
     private bool $persisted = false;
     private bool $deleted = false;
+    private bool $readOnly = false;
     private static array $filters = [];
     private static array $orders = [];
     private static array $booted = [];
@@ -61,10 +62,11 @@ abstract class Model extends Entity
     }
 
     /** @internal Query attaches metadata after light-entity directly hydrates this Model class. */
-    public function attachRecord(Database $database, EntityMapping $mapping, bool $persisted = true): void
+    public function attachRecord(Database $database, EntityMapping $mapping, bool $persisted = true, bool $readOnly = false): void
     {
         $this->owner = $database; $this->mapping = $mapping; $this->persisted = $persisted;
-        $this->original = $persisted ? $mapping->snapshotEntity($this, fromProvider: true) : [];
+        $this->readOnly = $readOnly;
+        $this->original = $persisted && !$readOnly ? $mapping->snapshotEntity($this, fromProvider: true) : [];
     }
 
     private function getMapping(): EntityMapping
@@ -75,6 +77,7 @@ abstract class Model extends Entity
 
     public function save(): int
     {
+        $this->assertWritable();
         if ($this->deleted) { throw new \LogicException('A deleted Model cannot be saved again.'); }
         $mapping = $this->getMapping();
         $context = $this->owner->writeContext($mapping);
@@ -93,6 +96,7 @@ abstract class Model extends Entity
 
     public function delete(): int
     {
+        $this->assertWritable();
         if (!$this->persisted || $this->deleted) { return 0; }
         $mapping = $this->getMapping();
         $context = $this->owner->writeContext($mapping);
@@ -108,9 +112,15 @@ abstract class Model extends Entity
         return $count;
     }
 
+    private function assertWritable(): void
+    {
+        if ($this->readOnly) { throw new \LogicException('A read-only Model cannot be saved or deleted.'); }
+    }
+    public function isReadOnly(): bool { return $this->readOnly; }
     public function exists(): bool { return $this->persisted && !$this->deleted; }
     public function isDirty(?string $property = null): bool
     {
+        if ($this->readOnly) { throw new \LogicException('Read-only Models have no original snapshot for change detection.'); }
         $mapping = $this->getMapping(); $current = $mapping->values($this);
         if ($property !== null) {
             if (!array_key_exists($property, $current)) { throw new \InvalidArgumentException('Unknown property: '.$property); }

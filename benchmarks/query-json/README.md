@@ -168,3 +168,33 @@ v1 comparison. Stage medians (100 rows):
 Raw results: `results-100.json`, `results-before-100.json` and
 `results-entity-100.json` (gitignored). These record working-tree source hashes;
 no performance fix has been committed automatically.
+
+## Read-only Model query — 100 records
+
+Reproduce with `READ_ONLY_BENCH=1 python3 benchmarks/query-json/run.py 50 100 5cc2226`.
+This runs 600 randomized independent workers: v1, ordinary v2 and read-only v2,
+plain/JSON fixtures and cold/warm modes. All final JSON bytes agree within each
+fixture; read-only changes snapshot/persistence behavior, not output.
+
+| Fixture | Warm API | Query/toArray median ms | Including JSON median ms | Peak growth MiB |
+| --- | --- | ---: | ---: | ---: |
+| plain | old | 1.0799 | 1.3108 | 0.2020 |
+| plain | new | 0.9802 | 1.0383 | 0.1493 |
+| plain | readonly | 0.9028 | 0.9682 | 0.1493 |
+| json | old | 1.0890 | 1.4358 | 0.2112 |
+| json | new | 1.1478 | 1.2292 | 0.2250 |
+| json | readonly | 1.0610 | 1.1360 | 0.2250 |
+
+Read-only warm query medians are about 8% lower than ordinary v2. Including
+serialization, medians decrease about 7% (plain) and 8% (JSON). Paired round
+bootstrap 95% intervals (5,000 resamples, seed 42) for total read-only minus
+ordinary v2 are [-0.118, -0.006] ms and [-0.132, -0.034] ms. These fixtures
+support a modest warm improvement; schema discovery and initialization still
+dominate cold requests, where the run shows no speed advantage. Measured peak
+memory growth is unchanged: ordinary snapshots already share scalar/default
+JSON arrays with copy-on-write. Mutable custom values can have different costs.
+
+Read-only skips `snapshotEntity()` entirely. Model Database/mapping references,
+converters and serialization remain. Model save/delete, query bulk writes and
+isDirty are guarded. SQLite and MySQL each pass 24 tests / 169 assertions;
+PHPStan level 5 passes. Raw samples: `results-readonly-100.json` (gitignored).

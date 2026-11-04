@@ -43,7 +43,7 @@ if ($action==='seed') {
 }
 if ($action!=='worker') { throw new InvalidArgumentException('Use seed or worker.'); }
 [$variant,$mode,$workload]=[$argv[2],$argv[3],$argv[4]];
-if (!in_array($variant,['old','baseline','new','entity','entity-no-tracking','profile'],true) || !in_array($mode,['cold','warm'],true) || !in_array($workload,['plain','json'],true)) {
+if (!in_array($variant,['old','baseline','new','entity','entity-no-tracking','profile','readonly'],true) || !in_array($mode,['cold','warm'],true) || !in_array($workload,['plain','json'],true)) {
     throw new InvalidArgumentException('Invalid worker arguments.');
 }
 $newRoot=dirname(__DIR__,2);
@@ -88,6 +88,7 @@ $fetch = static function () use ($variant, $pdo, &$context, &$profile): array {
         $profile = ['setup_ms'=>($prepared-$start)/1e6, 'materialize_ms'=>($hydrated-$prepared)/1e6, 'attach_snapshot_ms'=>($attached-$hydrated)/1e6];
         return $models;
     }
+    if ($variant === 'readonly') { return User::Query()->asReadOnly()->toArray(); }
     if (!str_starts_with($variant, 'entity')) { return User::Query()->toArray(); }
     $context ??= new \Light\Entity\DbContext($pdo, mappings: [\Light\Db\Database::getDefault()->metadata(User::class)]);
     $set = $context->set(User::class);

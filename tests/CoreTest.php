@@ -11,6 +11,16 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 
 class User extends Model {}
+class SnapshotCountingUser extends Model
+{
+    protected static $_table = 'User';
+    public static int $snapshots = 0;
+    public static function valueComparers(): array
+    {
+        $copy = static function ($v) { ++self::$snapshots; return json_decode(json_encode($v, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR); };
+        return ['settings' => new \Light\Entity\ValueComparer(fn ($a, $b) => $a === $b, $copy, $copy)];
+    }
+}
 class Membership extends Model { protected static $_table = 'memberships'; }
 class AliasUser extends Model { protected static $_table = 'User'; }
 class Collision extends Model {}
@@ -408,4 +418,58 @@ final class CoreTest extends TestCase
         $user=User::Get(1); $user->id=99;
         $this->expectException(\LogicException::class); $user->save();
     }
+    public function testReadOnlySkipsSnapshotsAndPreservesOrdinaryQuery(): void
+    {
+        SnapshotCountingUser::$snapshots = 0;
+        $base = SnapshotCountingUser::Query()->where(['id'=>1]);
+        $readOnly = $base->asReadOnly()->first();
+        self::assertSame(0, SnapshotCountingUser::$snapshots);
+        self::assertTrue($readOnly->isReadOnly());
+        self::assertTrue($readOnly->exists());
+        self::assertSame('light', $readOnly->settings['theme']);
+        $normal = $base->first();
+        self::assertGreaterThan(0, SnapshotCountingUser::$snapshots);
+        self::assertFalse($normal->isReadOnly());
+        self::assertSame($normal->toArray(), $readOnly->toArray());
+        self::assertSame(0, $normal->save());
+        $readOnly->name = 'Display';
+        $readOnly->settings['theme'] = 'dark';
+        self::assertSame('Display', json_decode(json_encode($readOnly, JSON_THROW_ON_ERROR), true)['name']);
+        foreach (['save','delete','isDirty'] as $method) {
+            try { $readOnly->$method(); self::fail('Expected read-only guard.'); }
+            catch (\LogicException $e) { self::assertStringContainsString('read-only', strtolower($e->getMessage())); }
+        }
+        self::assertSame('Ada', User::Get(1)->name);
+    }
+
+    public function testReadOnlyAppliesToAllMaterializersAndTypedModels(): void
+    {
+        $query = User::Query()->asReadOnly()->where(['id'=>['lte'=>2]])->orderBy('id')->limit(2);
+        foreach ([$query->toArray(), iterator_to_array($query), iterator_to_array($query->cursor())] as $rows) {
+            self::assertCount(2, $rows);
+            foreach ($rows as $user) { self::assertTrue($user->isReadOnly()); }
+        }
+        $typed = TypedUser::Query()->asReadOnly()->first();
+        self::assertTrue($typed->isReadOnly());
+        self::assertSame('light', $typed->settings['theme']);
+        self::assertTrue($query->any());
+        self::assertSame(2, $query->count());
+    }
+
+    public function testReadOnlyBlocksBulkWritesAndSurvivesCustomQueryCallbacks(): void
+    {
+        User::RegisterFilter('freshQuery', fn ($v, $q) => User::Query()->where(['id'=>$v]));
+        User::RegisterOrder('freshOrder', fn ($v, $q) => User::Query()->orderBy('id'));
+        $queries = [User::Query()->asReadOnly(), User::Query()->asReadOnly()->filters(['freshQuery'=>1]), User::Query()->asReadOnly()->order('freshOrder')];
+        foreach ($queries as $query) {
+            self::assertTrue($query->first()->isReadOnly());
+            foreach ([fn () => $query->update(['name'=>'Forbidden']), fn () => $query->delete()] as $write) {
+                try { $write(); self::fail('Expected read-only guard.'); }
+                catch (\LogicException $e) { self::assertStringContainsString('read-only', $e->getMessage()); }
+            }
+        }
+        self::assertSame(3, User::Query()->count());
+        self::assertSame('Ada', User::Get(1)->name);
+    }
+
 }
