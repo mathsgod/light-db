@@ -1,512 +1,297 @@
-[![GitHub](https://img.shields.io/github/license/mathsgod/light-db)](https://github.com/mathsgod/light-db)
-[![PHP](https://img.shields.io/badge/PHP-8.2%2B-blue.svg)](https://www.php.net/)
-[![CI](https://github.com/mathsgod/light-db/actions/workflows/tests.yml/badge.svg)](https://github.com/mathsgod/light-db/actions)
-[![Tests](https://img.shields.io/badge/tests-96%20passing-brightgreen.svg)](https://github.com/mathsgod/light-db)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)](https://www.mysql.com/)
-[![MariaDB](https://img.shields.io/badge/MariaDB-10.11%20%7C%2011.4-blue.svg)](https://mariadb.org/)
+# light-db
 
-# Light-DB
+A PHP 8.3+ Active Record ORM built on light-entity 1.x. It provides automatic
+schema mapping, immutable queries, JSON change tracking and atomic multi-Model
+transactions through a familiar Model API.
 
-Light-DB is a lightweight PHP ORM/database access layer built on top of Laminas DB, designed for modern PHP 8.2+ applications. It provides an Eloquent-like Active Record experience with support for auto-mapping, dynamic queries, relationship queries, JSON field operations, and pagination — with first-class compatibility for both **MySQL 8.0** and **MariaDB 10.11 / 11.4**.
+`Database` manages the PDO connection and metadata, `Model` provides record
+persistence, and `Query` handles filtering, sorting and pagination. light-entity
+supplies the underlying mapping, change tracking and unit of work.
 
-## ✨ Features
-
-- 🚀 **Modern PHP**: Built on PHP 8.2+ features with type declarations and modern PHP syntax
-- 🔗 **Multi-Database Support**: Based on Laminas DB — supports MySQL 8.0, MariaDB 10.11/11.4, PostgreSQL, SQLite, SQL Server
-- 🧩 **MariaDB-Aware**: Detects MariaDB at runtime and adjusts column metadata (JSON detection, default-value parsing) automatically
-- 📦 **Eloquent-Style**: Familiar Active Record pattern with an Eloquent-like API powered by `illuminate/collections`
-- 🎯 **Smart Queries**: Complex conditional queries, sorting, grouping, and aggregation functions
-- 📄 **Pagination Support**: Built-in Laminas Paginator integration
-- 🔄 **JSON Fields**: Native JSON field operations with automatic serialization/deserialization
-- 🔗 **Relationship Queries**: Inter-model relationship queries and dynamic property access
-- ✅ **CI-Tested**: Automated test matrix on GitHub Actions across PHP 8.2 / 8.3 / 8.4 / 8.5 × MySQL 8.0 / MariaDB 10.11 / MariaDB 11.4
-
-## 📋 Requirements
-
-- PHP 8.2 or higher
-- PDO extension
-- A supported database (tested against):
-  - MySQL 8.0
-  - MariaDB 10.11 / 11.4
-
-## 🚀 Installation
-
-Install via Composer:
-
-```bash
-composer require mathsgod/light-db
-```
-
-## ⚙️ Configuration
-
-Create a `.env` file in your project root:
-
-```env
-DATABASE_DRIVER=Pdo_Mysql
-DATABASE_HOSTNAME=localhost
-DATABASE_PORT=3306
-DATABASE_DATABASE=your_database
-DATABASE_USERNAME=your_username
-DATABASE_PASSWORD=your_password
-DATABASE_CHARSET=utf8mb4
-```
-
-## 🎯 Basic Usage
-
-### Defining Models
+Upgrading from 1.x: see the [v2 migration guide](docs/migration-v2.md).
 
 ```php
-<?php
+use Light\Db\{Database, Model};
 
-use Light\Db\Model;
-
-class User extends Model
-{
-    // Uses class name as table name by default
-    // Customize with: protected static $_table = 'custom_table_name';
-}
-
-class Post extends Model
-{
-    protected static $_table = 'posts';
-}
-```
-
-### CRUD Operations
-
-#### Creating Records
-
-```php
-// Method 1: Create + Save
-$user = User::Create([
-    'name' => 'Raymond Chong',
-    'email' => 'raymond@example.com',
-    'age' => 30
-]);
-$user->save();
-
-// Method 2: Direct property assignment
-$user = User::Create();
-$user->name = 'John Doe';
-$user->email = 'john@example.com';
-$user->save();
-```
-
-#### Querying Records
-
-```php
-// Query by primary key
-$user = User::Get(1);
-
-// Basic queries
-$users = User::Query(['status' => 'active'])->toArray();
-
-// Complex queries
-$activeUsers = User::Query()
-    ->filters([
-        'age' => ['gte' => 18, 'lte' => 65],
-        'status' => ['in' => ['active', 'premium']],
-        'email' => ['contains' => '@gmail.com']
-    ])
-    ->sort('created_at:desc')
-    ->toArray();
-
-// Get first record
-$firstUser = User::Query(['status' => 'active'])->first();
-```
-
-#### Updating Records
-
-```php
-// Single record update
-$user = User::Get(1);
-$user->name = 'Updated Name';
-$user->email = 'updated@example.com';
-$user->save();
-
-// Batch update
-$affected = User::Query(['status' => 'inactive'])
-    ->update(['status' => 'archived']);
-```
-
-#### Deleting Records
-
-```php
-// Single record deletion
-$user = User::Get(1);
-$user->delete();
-
-// Batch deletion
-$deleted = User::Query(['status' => 'spam'])
-    ->delete();
-```
-
-### 🔍 Advanced Queries
-
-#### Query Conditions
-
-```php
-$query = User::Query()->filters([
-    'age' => ['eq' => 25],           // Equal to
-    'score' => ['gt' => 80],         // Greater than
-    'salary' => ['gte' => 50000],    // Greater than or equal
-    'rating' => ['lt' => 5],         // Less than
-    'points' => ['lte' => 100],      // Less than or equal
-    'status' => ['in' => ['active', 'premium']], // In array
-    'name' => ['contains' => 'john'],  // Contains pattern
-    'category' => ['ne' => 'spam']   // Not equal
-]);
-```
-
-#### Sorting and Limiting
-
-```php
-$users = User::Query()
-    ->sort('created_at:desc,name:asc')  // Multi-field sorting
-    ->limit(10)                         // Limit results
-    ->offset(20)                        // Offset
-    ->toArray();
-```
-
-#### OR / AND Logic with `filters()`
-
-Use the `_or` and `_and` magic keys inside `filters()` to build boolean logic.
-
-```php
-use Light\Db\Model;
+// Optional when a DATABASE_DSN or the usual DATABASE_* .env variables are set.
+Database::setDefault(new Database($pdo));
 
 class User extends Model {}
 
-// WHERE (age >= 18 OR name = 'Peter')
-$users = User::Query()->filters([
-    '_or' => [
-        ['age' => ['gte' => 18]],
-        ['name' => 'Peter']
-    ]
-])->toArray();
-```
-
-Mixing outer `where()` with inner `_or` / `_and`:
-
-```php
-// WHERE status = 'active' AND (age >= 30 OR name = 'Test User 1')
-$users = User::Query()
-    ->where(['status' => 'active'])
-    ->filters([
-        '_or' => [
-            ['age' => ['gte' => 30]],
-            ['name' => 'Test User 1']
-        ]
-    ])
-    ->toArray();
-```
-
-Nested `_or` and `_and` for deeper boolean trees:
-
-```php
-// WHERE (age > 28 AND status = 'active')
-//    OR (name = 'Test User 3' AND status = 'inactive')
-$users = User::Query()->filters([
-    '_or' => [
-        [
-            '_and' => [
-                ['age' => ['gt' => 28]],
-                ['status' => 'active']
-            ]
-        ],
-        [
-            '_and' => [
-                ['name' => 'Test User 3'],
-                ['status' => 'inactive']
-            ]
-        ]
-    ]
-])->toArray();
-```
-
-Alternatively, the underlying `Laminas\Db\Sql\Select::where()` accepts a combination operator:
-
-```php
-use Laminas\Db\Sql\Predicate\PredicateSet;
-
-// WHERE (age >= 30 OR name = 'Test User 1')
-$users = User::Query()
-    ->where(['age >= ?' => 30], PredicateSet::OP_OR)
-    ->where(['name = ?' => 'Test User 1'], PredicateSet::OP_OR)
-    ->toArray();
-```
-
-> **Tip**: `filters(['_or' => ...])` is generally easier to read and supports arbitrary nesting. Use the direct `where(..., OP_OR)` form when you need fine-grained control over a single predicate.
-
-#### Aggregate Functions
-
-```php
-$userCount = User::Query()->count();
-$avgAge = User::Query()->avg('age');
-$totalSalary = User::Query()->sum('salary');
-$minAge = User::Query()->min('age');
-$maxAge = User::Query()->max('age');
-```
-
-### 📄 Pagination
-
-```php
-$query = User::Query(['status' => 'active']);
-$paginator = $query->getPaginator();
-
-// Set items per page
-$paginator->setItemCountPerPage(20);
-$paginator->setCurrentPageNumber(1);
-
-// Get current page data
-$currentItems = $paginator->getCurrentItems();
-$totalItems = $paginator->getTotalItemCount();
-$totalPages = $paginator->getPages()->pageCount;
-```
-
-### 🔄 JSON Field Operations
-
-```php
-// Create record with JSON data
-$user = User::Create([
-    'name' => 'John',
-    'profile' => [
-        'avatar' => 'avatar.jpg',
-        'settings' => [
-            'theme' => 'dark',
-            'notifications' => true
-        ],
-        'tags' => ['developer', 'php', 'mysql']
-    ]
-]);
-$user->save();
-
-// Read JSON data
-$user = User::Get(1);
-echo $user->profile['settings']['theme']; // 'dark'
-
-// Update JSON data
-$user->profile['settings']['theme'] = 'light';
-$user->profile['tags'][] = 'javascript';
-$user->save();
-```
-
-> **Note**: MariaDB stores JSON columns as `LONGTEXT` with a `JSON_VALID()` CHECK constraint. Light-DB detects this at runtime and treats them as `json` data type for transparent encoding/decoding.
-
-### 🔗 Relationship Queries
-
-```php
-// Assuming UserList model with user_id column
-$user = User::Get(1);
-
-// Get related UserList query object
-$userLists = $user->UserList;  // Returns Query object
-
-// Further querying
-$activeLists = $user->UserList
-    ->filters(['status' => 'active'])
-    ->sort('created_at:desc')
-    ->toArray();
-```
-
-### 🛠️ Advanced Features
-
-#### Declarative Filters & Sorts (`Model::boot()`)
-
-A model's relation-based or computed filters and sorts can be **declared on the model itself** instead of being registered ad-hoc from controllers. Light-DB auto-invokes the model's `boot()` lifecycle method the first time `Model::Query()` is called for the class, so registrations are guaranteed to be in place before any filter is resolved.
-
-Override `filterDefinitions()` and / or `orderDefinitions()` to return an `[name => callable]` map:
-
-```php
-use Light\Db\Model;
-
-class Schedule extends Model
-{
-    protected static function filterDefinitions(): array
-    {
-        return [
-            'Letter' => function ($value) {
-                return "letter_id IN (SELECT letter_id FROM letter WHERE subject = " . $value . ")";
-            },
-        ];
-    }
-
-    protected static function orderDefinitions(): array
-    {
-        return [
-            'recent' => fn($dir) => "created_at $dir",
-        ];
-    }
-}
-```
-
-After this, **any** caller of `Schedule::Query()->filters(['Letter' => $v])` — including sub-queries from unrelated code paths — gets the right SQL, without the controller having to call `RegisterFilter()` first. Boot is idempotent per process per class, so multiple `Query::Query()` invocations don't double-register.
-
-Inheritance via `parent::`:
-
-```php
-class Letter extends Schedule
-{
-    protected static function filterDefinitions(): array
-    {
-        return array_merge(parent::filterDefinitions(), [
-            'Tag' => fn($v) => "letter_id IN (SELECT letter_id FROM letter_tag WHERE tag = $v)",
-        ]);
-    }
-}
-```
-
-Borrow a filter from another class:
-
-```php
-'Schedule' => Schedule::filterDefinitions()['Letter'],
-```
-
-> The legacy `Model::RegisterFilter()` / `Model::RegisterOrder()` APIs are still supported and remain the right choice when the registration depends on request-scoped state (current user, request params, etc.) that the static `filterDefinitions()` hook cannot see. Both styles can coexist on the same model.
-
-#### Collection Operations
-
-```php
-$users = User::Query(['status' => 'active']);
-
-// Map operation
-$names = $users->map(fn($user) => $user->name)->toArray();
-
-// Filter operation
-$premiumUsers = $users->filter(fn($user) => $user->type === 'premium');
-
-// Method chaining
-$emailList = User::Query()
-    ->filters(['status' => 'active'])
-    ->map(fn($user) => $user->email)
-    ->toArray();
-```
-
-#### Custom Sorting
-
-```php
-// Legacy: register a sort ad-hoc from anywhere (still supported)
-User::RegisterOrder('popular', function($query) {
-    return $query->order(['score DESC', 'views DESC']);
-});
-
-// Use custom sorting
-$popularUsers = User::Query()->sort('popular')->toArray();
-```
-
-> Prefer `orderDefinitions()` on the model itself for new code — see [Declarative Filters & Sorts](#declarative-filters--sorts-modelboot).
-
-#### Binding Input Parameters to Prepared Statements
-
-Both `cursor()` and `execute()` accept an optional `array $input_parameters = []` argument. These parameters are bound to the underlying `Laminas\Db\Adapter\ParameterContainer` and matched against the `?` placeholders that Light-DB/Laminas auto-generates for where conditions. Both methods iterate the same way and return hydrated model instances.
-
-```php
-// cursor() returns a Laravel LazyCollection — perfect for streaming large result sets
-foreach (User::Query()->cursor() as $user) {
+foreach (User::Query() as $user) {
     echo $user->name;
 }
 
-// execute() returns a regular Collection eagerly materialized
-$users = User::Query()->execute()->toArray();
+$user = User::Create(['name' => 'Ada']);
+$user->save();
+
+$user = User::Get(1); // null when missing; named equality conditions also work
+$user->name = 'Mary';
+$user->settings['theme'] = 'dark';
+$user->save();
+$user->delete();
 ```
 
-`input_parameters` is a thin pass-through to the prepared statement. Use it when you want to be explicit about what gets bound:
+## Conventions and metadata
+
+The default table name is the exact short class name (`User` maps to `User`).
+Override with `protected static $_table = 'users';` or `#[Light\Entity\Table('users')]`.
+Schema discovery supplies columns, primary/composite keys, defaults and generated
+columns; no manual field list or base constructor call is required. Models can
+mix dynamic attributes with public typed properties. The base constructor is
+final and accepts an optional attribute array; hydration bypasses constructors.
+
+Native JSON/JSONB declarations automatically receive a converter and comparer,
+using PHP arrays for objects and lists. JSON changes through references are
+tracked, including nested array changes. As in the old associative decoding,
+empty JSON objects decode to empty arrays. SQL NULL remains null. SQLite TEXT
+and MariaDB JSON aliases reported as LONGTEXT are not automatically recognized
+as JSON; configure a converter/comparer explicitly if needed.
+`TINYINT(1)` remains integer. Decimal/date values follow light-entity's defaults.
+Override `valueConverters()` / `valueComparers()` to customize property mappings.
+
+`Database` caches metadata and no-tracking read contexts per Model class. Every
+GET/query still reads the database, yielding a fresh Model. Existing Models keep
+their original Database binding even if the application changes the default.
+Call `$database->clearMetadata()` after DDL or changing the selected database on
+the same PDO; obtain fresh Models after schema changes.
+
+## Querying
 
 ```php
-// The framework already binds values from where() conditions automatically,
-// so this is normally a no-op. It exists for symmetry and advanced cases
-// (e.g. when the Select contains Expression objects with named placeholders).
-User::Query(['status' => 'active'])->execute([
-    'minAge' => 18,
-])->toArray();
+$query = User::Query()
+    ->filters(['name' => ['contains' => 'ar'], 'age' => ['gte' => 18]])
+    ->sort('age:desc,name:asc');
+
+$total = $query->count(); // filtered total BEFORE limit/offset
+$page = $query->limit(20)->offset(40)->toArray();
+
+$first = $query->first(); // Model|null
+$models = User::Query(['id' => [1, 2, 3]])->toArray();
+
+$users = User::Query()->whereRaw('BINARY name = ?', [$name]);
+$affected = User::Query(['age' => ['lt' => 18]])->update(['status' => 'minor']);
+$deleted = User::Query(['status' => 'inactive'])->delete();
+
+$names = User::Query()->asEnumerable()->select(fn ($user) => $user->name)->toArray();
 ```
 
-> **Note**: If you pass keys that don't match any `?` token in the query, the database driver will reject the statement with `HY093` (PDO: "number of bound variables does not match number of tokens"). The placeholder count is determined by your where/filter/join expressions — Light-DB does not invent extra `?` tokens for unused parameters.
+Queries are immutable: keep the returned Query when adding conditions, sorting
+or pagination. `where()` accepts condition maps or light-linq expressions.
+Operators include `eq`, `neq`/`ne`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`,
+`between`, `notBetween`, `null`, `notNull`, `like`, `contains`, `startsWith`,
+`endsWith`, with optional leading `_`. Logical groups use `_and`, `_or`, `_not`.
+String convenience operators escape literal wildcard characters; `like` accepts
+a pattern. Conditions and order fields are validated against mapped columns.
+`whereRaw()` takes trusted SQL and separate scalar provider-value parameters.
 
-## 🗄️ Database Compatibility
+`count()`, `sum()`, `avg()`, `min()`, `max()` refer to the filtered set before
+pagination. `first()`, `any()`, iteration and `toArray()` respect pagination.
+Bulk writes execute immediately, bypass Model save/delete methods and leave
+already-loaded Models stale. Paginated or ordered bulk writes are rejected.
 
-| Database | Version | Status |
-|---|---|---|
-| MySQL    | 8.0     | ✅ Fully supported |
-| MariaDB  | 10.11   | ✅ Fully supported |
-| MariaDB  | 11.4    | ✅ Fully supported |
+Normal `foreach` materializes the result before yielding, allowing nested reads
+and per-row `save()`. Explicit `cursor()` streams instead; MySQL's active
+unbuffered result prevents other queries on that connection until it is closed.
 
-Light-DB automatically detects MariaDB at connection time by inspecting `SELECT VERSION()`. Internally, this enables:
+## Custom filters and ordering
 
-- **JSON column detection** — MariaDB reports `json` columns as `longtext` in `INFORMATION_SCHEMA`; Light-DB queries `CHECK_CONSTRAINTS` for `json_valid()` clauses to recover the real type
-- **Default-value parsing** — MariaDB quotes string defaults (e.g. `'foo'`) while MySQL 8.0 does not; Light-DB normalizes both formats
-- **Connection setup** — `utf8mb4_0900_ai_ci` collation is only set on MySQL 8.x
+```php
+use Light\Db\Query;
+use Light\Linq\Expr;
 
-## 🧪 Running Tests
+User::RegisterFilter('adult', fn ($minimum) =>
+    Expr::gte(Expr::field('age'), $minimum));
 
-A `.env` file with valid database credentials is required (see [Configuration](#️-configuration)).
+User::RegisterFilter('keyword', fn ($value, Query $query) =>
+    $query->whereRaw('name LIKE ?', [$value . '%']));
+
+User::RegisterOrder('byAge', fn ($direction) => Expr::field('age'));
+
+$users = User::Query()->filters(['adult' => 18])->sort('byAge:desc');
+```
+
+Filters return an expression, condition map, or a Query for the same Model and
+Database. Orders return an expression or such a Query. Callbacks receive the
+value/direction first and the current Query second. A Query callback must return
+its new Query; mutation of a Laminas Predicate is not supported. Model subclasses
+may override protected `filterDefinitions()` and `orderDefinitions()` instead.
+Custom named filters are applied at the top level; nested logical groups accept
+ordinary mapped-column conditions.
+
+## Read-only queries
+
+```php
+$users = User::Query()->asReadOnly()->where(['age'=>['gte'=>18]])->toArray();
+echo json_encode($users, JSON_THROW_ON_ERROR);
+```
+
+`asReadOnly()` returns a new Query. It keeps converters and User instances but
+skips Model original snapshots. It applies to `first()`, `toArray()`, buffered
+iteration and `cursor()`, including further filters/orders/pagination. Custom
+callbacks returning another Query cannot remove an existing read-only flag.
+Normal queries keep their existing persistence behavior.
+
+Read-only Models report `isReadOnly() === true`; their fields remain mutable for
+presentation. Model `save()`/`delete()` and Query `update()`/`delete()` throw
+LogicException. `isDirty()` also throws because there is no original baseline.
+`exists()`, `_id()`, `toArray()` and JSON serialization remain available.
+This is an API persistence restriction; independent raw SQL or another query on
+the same database is outside its scope.
+
+## Persistence boundaries
+
+Each Model save/delete uses its own light-entity unit of work and automatic
+transaction, preserving the original snapshot and caller's object on failure.
+The tracker attaches the actual Model with its original model-value snapshot;
+no working clone or attribute reassignment is required. Saving one Model never flushes
+another Model's unsaved changes. Primary-key and computed-column modifications
+are rejected. Deleted Models cannot be saved again. `exists()`, `isDirty()`,
+`toArray()`, `_id()` and `_key()` provide basic Model introspection.
+
+`Database::transaction()` groups Model writes into one light-entity unit of work:
+
+```php
+$db = Database::getDefault();
+$user = User::Get(1); // Models loaded before the callback also work.
+$result = $db->transaction(function () use ($user) {
+    $user->name = 'Mary';
+    $user->save();
+    $other = User::Create(['name' => 'Ada']);
+    $other->save();
+    return 'done';
+});
+```
+
+Within the callback, `save()` and `delete()` enqueue writes and return `0`;
+no Model SQL writes execute until the callback returns. One `saveChanges()`
+commits all queued Models atomically. The transaction returns the callback result.
+Generated IDs/defaults and Model persistence snapshots update after commit.
+Reads during the callback see database values, not queued changes. Repeated writes
+of the same instance use its final values and last operation; save then delete
+of a new Model cancels its insert. Only explicitly queued Models participate.
+Models must belong to this Database; writes through another Database are independent.
+
+Callback exceptions discard queued operations. Commit failures roll back all writes;
+caller edits remain dirty and can be retried. Nested transactions and existing PDO
+transactions are rejected. Query bulk update/delete are rejected within the callback;
+raw PDO writes are outside this deferred transaction and must not be mixed with it.
+Automatic relationship/key propagation between new Models is not provided by this
+API: generated IDs are unavailable until commit. Outside the callback, Model writes
+remain immediate and isolated.
+
+`Include`/relationship conventions, GraphQL mapper
+integration, joins/projection wrappers, legacy `wasChanged()`/audit hooks and
+schema-management wrappers are not provided by the light-db 2 API.
+The old Laminas Query/Predicate API is intentionally not emulated.
+
+## Read-path optimization
+
+For conventional dynamic Models, hydration already produces validated model
+attributes. The original snapshot reuses that array with PHP copy-on-write,
+avoiding repeated magic-property reads while retaining model-value validation. The standard JSON decoder
+produces arrays/scalars without references, so its hydrated snapshot can also
+share storage until mutation rather than immediately encode/decode a second
+copy. This optimization does not apply to custom converters or magic accessors;
+the general validation/comparer path is retained for them and public typed
+properties. Save-time snapshots keep their existing comparer behavior.
+
+Entity owns dynamic attribute storage and reference access. Model delegates bulk
+assignment and snapshots to EntityMapping, and directly attaches itself on save.
+JSON serialization caches public-property metadata per class and reads values
+per instance. Dynamic/custom-setter cases retain the generic serialization path.
+`Query::toArray()` attaches Models directly to the materialized array rather
+than collecting a second array through the iterator. Ordinary `foreach` still
+finishes the database result before application code can issue other queries.
+
+Benchmarks and before/after results: [query → JSON](benchmarks/query-json/README.md).
+
+## Tests
+
+GitHub Actions runs the same suite against SQLite and MySQL 8.0 on PHP 8.3,
+8.4 and 8.5 for pushes and pull requests, with manual dispatch also available.
+CI verifies the PDO connection and fails on skipped tests. The SQLite PHP 8.3
+job also runs Composer validation and PHPStan. See
+[the test workflow](.github/workflows/tests.yml).
+
+PHP >= 8.3 is required. Composer installs the published light-entity 1.x package;
+no sibling checkout or local path repository is required.
 
 ```bash
-# Run all tests
-composer test
-
-# Run basic functionality tests
-composer test-basic
-
-# Run CRUD operation tests
-composer test-crud
-
-# Run JSON field tests
-composer test-json
-
-# Run unit tests only
-composer test-unit
-
-# Run integration tests only
-composer test-integration
+composer install
+composer test        # SQLite; install pdo_sqlite
+composer test:mysql  # isolated MySQL 8 Docker fixture, default port 33390
+composer analyse     # PHPStan level 5
 ```
 
-## ✅ Continuous Integration
+Each test uses a fresh SQLite database or creates/drops its own randomly named
+MySQL schema. No existing framework database is used. Override
+`LIGHT_DB_TEST_PORT` to select another Docker port.
 
-Tests run automatically on every push and pull request via [GitHub Actions](https://github.com/mathsgod/light-db/actions). The CI matrix covers:
+The PHPUnit suite covers Model lifecycle, converters/snapshot isolation,
+computed and composite-key fields, read-only guards, structured filter operators,
+malformed filters, literal wildcard escaping, incompatible filter/order callbacks,
+fresh-query behavior, and pagination boundaries. A 100-record fixture with no
+JSON columns checks ordinary/read-only Model output against PDO rows and verifies
+that ordinary Models still save changes independently. Both database backends
+run the same tests through the shared `DatabaseTestCase` fixture.
 
-- **PHP**: 8.2, 8.3, 8.4, 8.5
-- **Database**: MySQL 8.0, MariaDB 10.11, MariaDB 11.4
+To check isolation with a reproducible shuffled order:
 
-That gives **12 parallel jobs** ensuring compatibility across the supported matrix.
+```bash
+vendor/bin/phpunit --order-by=random --random-order-seed=20261104
+composer test:mysql -- --order-by=random --random-order-seed=20261104
+```
 
-## 📊 Test Coverage
+## Global query filters
 
-- **96** test cases
-- **380** assertions
-- Covers all core functionality
-- Includes unit and integration tests
-- Supports error handling and edge case testing
+Model definitions are registered through the native light-entity
+`onModelCreating()`/ModelBuilder pipeline:
 
-## 📦 Dependencies
+```php
+class User extends \Light\Db\Model
+{
+    protected static function queryFilterDefinitions(): array
+    {
+        return [
+            'softDelete' => \Light\Linq\Expr::eq(\Light\Linq\Expr::field('is_deleted'), 0),
+            // Resolve application request state when the query executes:
+            'tenant' => fn () => ['tenant_id' => CurrentTenant::id()],
+        ];
+    }
+}
 
-| Package | Version | Purpose |
-|---|---|---|
-| `laminas/laminas-db` | `^2.20` | Database abstraction layer |
-| `laminas/laminas-paginator` | `^2.20` | Pagination support |
-| `illuminate/collections` | `^11.0 \|\| ^12.0` | Eloquent-style collections |
-| `vlucas/phpdotenv` | `^5.6` | Environment variable loading |
+User::Query()->toArray(); // Both filters apply.
+User::Query()->asReadOnly()->toArray(); // Same filters, no Model snapshots.
+User::Query()->ignoreQueryFilters(['softDelete'])->toArray(); // Keep tenant scope.
+User::Query()->ignoreQueryFilters()->toArray(); // Disable all query filters.
+```
 
-## 📝 License
+Filters affect Get, query reads, count/aggregates, cursor and bulk update/delete.
+They use ordinary compiler parameter binding and converter rules. Ignoring filters
+is query-local, accumulates named exclusions and preserves read-only behavior.
+Registered filter/order callbacks returning a fresh Query retain those scopes.
+Existing RegisterFilter/filterDefinitions remain explicitly selected search filters;
+queryFilterDefinitions are automatic predicates. Native saveChanges semantics are
+unchanged: an explicitly loaded writable Model can save its changes even if it was
+loaded by ignoring a filter. Soft-delete writes require separate application logic.
 
-This project is licensed under the [MIT License](LICENSE).
+`CurrentTenant` above represents your application's tenant resolver. Ordinary
+queries without queryFilterDefinitions retain their existing behavior. Full native
+filter and relationship semantics are documented in light-entity's README.
 
-## 👨‍💻 Author
+### Persistence extension hook
 
-**Raymond Chong**
-- Email: mathsgod@yahoo.com
-- GitHub: [@mathsgod](https://github.com/mathsgod)
+Model subclasses may override `protected function afterPersistence(bool $deleted): void`
+to run work after a successful write commits. Deferred transactions invoke hooks only
+after all queued Models have accepted their committed state. Hooks do not run for
+failed writes or a cancelled new-Model insert. A hook exception propagates after the
+database commit; it does not roll back data. External writes made by a hook are not
+part of the original transaction. The protected `database()` accessor returns the
+Database bound to that Model, even if the application changes its default.
 
-## 🤝 Contributing
-
-Issues and Pull Requests are welcome!
-
-1. Fork the project
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📚 More Examples
-
-Check the test files in the `tests/` directory for more usage examples and best practices.
+`filters()` also accepts a list of condition maps, combined with AND, for example
+`filters([['age' => ['gte' => 18]], ['name' => ['contains' => 'ar']]])`.
+Empty maps are ignored, so the frontend placeholder `filters([[]])` leaves the
+query unchanged. Nested lists and registered filters follow the same rules;
+non-array list members are rejected.
