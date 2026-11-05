@@ -204,6 +204,12 @@ Benchmarks and before/after results: [query → JSON](benchmarks/query-json/READ
 
 ## Tests
 
+GitHub Actions runs the same suite against SQLite and MySQL 8.0 on PHP 8.3,
+8.4 and 8.5 for pushes and pull requests, with manual dispatch also available.
+CI verifies the PDO connection and fails on skipped tests. The SQLite PHP 8.3
+job also runs Composer validation and PHPStan. See
+[the test workflow](.github/workflows/tests.yml).
+
 PHP >= 8.3 is required. Composer installs the published light-entity 1.x package;
 no sibling checkout or local path repository is required.
 
