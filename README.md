@@ -277,3 +277,9 @@ failed writes or a cancelled new-Model insert. A hook exception propagates after
 database commit; it does not roll back data. External writes made by a hook are not
 part of the original transaction. The protected `database()` accessor returns the
 Database bound to that Model, even if the application changes its default.
+
+`filters()` also accepts a list of condition maps, combined with AND, for example
+`filters([['age' => ['gte' => 18]], ['name' => ['contains' => 'ar']]])`.
+Empty maps are ignored, so the frontend placeholder `filters([[]])` leaves the
+query unchanged. Nested lists and registered filters follow the same rules;
+non-array list members are rejected.

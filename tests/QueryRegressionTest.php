@@ -53,6 +53,23 @@ final class QueryRegressionTest extends DatabaseTestCase
         self::assertSame($expected !== [], $query->any());
     }
 
+    public function testFilterListsComposeWithAndAndKeepOriginalQueryImmutable(): void
+    {
+        $query = RegressionUser::Query()->orderBy('id');
+        self::assertSame(3, $query->filters([[]])->count());
+        $filtered = $query->filters([[], ['age'=>['gte'=>20]], [['name'=>['ne'=>'Bob']]]]);
+        self::assertSame([1], array_map(fn ($user) => $user->id, $filtered->toArray()));
+        self::assertSame(3, $query->count());
+        RegressionUser::RegisterFilter('minimumAge', fn ($age, Query $q) => $q->where(['age'=>['gte'=>$age]]));
+        self::assertSame(2, $query->filters([['minimumAge'=>20], []])->count());
+    }
+
+    public function testFilterListsRejectScalarMembers(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        RegressionUser::Query()->filters([1]);
+    }
+
     public static function invalidFilters(): iterable
     {
         yield 'unknown field' => [['missing'=>1]];

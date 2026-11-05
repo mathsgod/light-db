@@ -60,6 +60,13 @@ final class Query implements \IteratorAggregate, \Countable
     public function filters(?array $filters): self
     {
         $query = $this;
+        if ($filters !== null && array_is_list($filters)) {
+            foreach ($filters as $group) {
+                if (!is_array($group)) { throw new \InvalidArgumentException('Filter lists require condition maps.'); }
+                $query = $query->filters($group);
+            }
+            return $query;
+        }
         foreach ($filters ?? [] as $name => $value) {
             $callback = $this->class::registered('filter', (string)$name);
             if ($callback === null) { $query = $query->where([$name=>$value]); continue; }
