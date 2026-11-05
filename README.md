@@ -1,8 +1,12 @@
-# light-db — light-entity major-version prototype
+# light-db
 
-A small Active Record layer over light-entity. The runtime consists of four
-classes: `Database`, `Model`, `Query`, and `ModelMetadata`. It has no Laminas,
-Illuminate Collection, paginator, or GraphQL dependency.
+A PHP 8.3+ Active Record ORM built on light-entity 1.x. It provides automatic
+schema mapping, immutable queries, JSON change tracking and atomic multi-Model
+transactions through a familiar Model API.
+
+`Database` manages the PDO connection and metadata, `Model` provides record
+persistence, and `Query` handles filtering, sorting and pagination. light-entity
+supplies the underlying mapping, change tracking and unit of work.
 
 Upgrading from 1.x: see the [v2 migration guide](docs/migration-v2.md).
 
@@ -42,7 +46,7 @@ using PHP arrays for objects and lists. JSON changes through references are
 tracked, including nested array changes. As in the old associative decoding,
 empty JSON objects decode to empty arrays. SQL NULL remains null. SQLite TEXT
 and MariaDB JSON aliases reported as LONGTEXT are not automatically recognized
-as JSON in this prototype; configure a converter/comparer explicitly if needed.
+as JSON; configure a converter/comparer explicitly if needed.
 `TINYINT(1)` remains integer. Decimal/date values follow light-entity's defaults.
 Override `valueConverters()` / `valueComparers()` to customize property mappings.
 
@@ -178,7 +182,7 @@ remain immediate and isolated.
 
 `Include`/relationship conventions, GraphQL mapper
 integration, joins/projection wrappers, legacy `wasChanged()`/audit hooks and
-schema-management wrappers are also outside this first core implementation.
+schema-management wrappers are not provided by the light-db 2 API.
 The old Laminas Query/Predicate API is intentionally not emulated.
 
 ## Read-path optimization
