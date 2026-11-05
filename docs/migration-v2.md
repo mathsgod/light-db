@@ -200,39 +200,47 @@ to `save()/delete()`. Keep application write permissions explicit.
 - `asReadOnly()` skips original snapshots. Its Models can be changed for
   presentation, but `save()/delete()/isDirty()` and Query bulk writes are rejected.
 
-## 7. Group Model writes with transaction()
+## 7. Group immediate Model writes with transaction()
 
 ```php
-$database->transaction(function () use ($user, $notification) {
-    $user->name = 'Mary';
-    $user->save();
-    $notification->save();
+return Database::getDefault()->transaction(function () use ($values) {
+    $record = User::Create($values);
+    $record->save(); // ID, defaults and computed values are available now.
+    AuditEvent::Create(['entity_id' => $record->id, 'action' => 'create'])->save();
+    return $record->id;
 });
 ```
 
-Inside the callback, Model writes are queued and return `0`. One final
-light-entity `saveChanges()` commits the unit atomically. Models loaded before
-the callback can participate if bound to that Database. Queries do not see queued
-changes, and new generated IDs/defaults are unavailable until commit. There is
-no automatic new-Model relationship/key propagation in this API.
+Each `save()`/`delete()` executes immediately and returns its normal write count.
+The callback's writes commit together when it returns; callback/commit errors
+roll back the transaction. Queries on the same Database see writes during the
+callback. Models loaded beforehand participate if bound to that Database. Saving
+one Model never flushes another Model's unsaved edits. Repeated saves execute
+separately; saving then deleting a new Model performs both SQL operations.
 
-Repeated writes of one instance use its final values and last operation. Saving
-then deleting a new Model cancels its insert. Only explicitly queued Models
-participate. Callback errors discard queued operations; commit failures roll back
-writes and retain edits for retry. Outside the callback, Model writes remain
-immediate and isolated from other Models' unsaved changes.
+An application TransactionManager can delegate its `run($operation)` to
+`Database::getDefault()->transaction($operation)`. Query bulk writes and raw PDO
+writes on its connection participate too. Each Model save uses a savepoint;
+catching a save error permits the callback to continue, while an uncaught error
+rolls back the whole transaction. Do not manage the connection's transaction
+boundary or run DDL inside the callback. Nested/external transactions remain
+unsupported. Do not wrap Model saves in an external PDO `beginTransaction()` and
+expect them to join it.
 
-Nested transactions and existing PDO transactions are rejected. Query bulk writes
-inside the callback are rejected; raw PDO writes or writes through another
-Database are outside this deferred boundary. Do not wrap Model saves in an
-external PDO `beginTransaction()` and expect them to join it.
+This fixes the earlier v2 behavior that deferred Model writes until the callback
+returned. Remove assumptions that transaction saves return `0`, new IDs are
+unavailable inside the callback, queries cannot see saves, or repeated writes
+collapse into a single operation. There is no separate deferred transaction mode.
 
-`afterPersistence(bool $deleted): void` is a protected extension hook invoked
-after successful persistence. Deferred transactions accept every queued Model's
-state before invoking hooks. Hooks do not run for failed writes or a cancelled
-new insert. Hook failures propagate after commit and cannot undo committed data;
-external audit writes from hooks are not atomic with the original transaction.
-The protected `database()` accessor returns the Model's bound Database.
+Rollback restores database rows, not previously accepted PHP Model state or
+generated IDs. Discard/reload participating Models before retrying; create fresh
+instances for rolled-back inserts.
+
+`afterPersistence(bool $deleted): void` hooks are queued in save/delete call order
+and run after the outer commit against each Model's final state; rollback discards
+them. Post-commit hook errors cannot undo data. Audit writes requiring atomicity
+belong inside the callback, not in a post-commit hook. The protected `database()`
+accessor returns the Model's bound Database.
 
 ## 8. Update integrations and validate
 

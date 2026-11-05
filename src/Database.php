@@ -15,69 +15,54 @@ final class Database
     private ModelMetadata $metadata;
     /** @var array<class-string<Model>, DbContext> */
     private array $contexts = [];
-    /** @var array<int, array{Model, bool}>|null */
-    private ?array $pending = null;
+    private ?DbContext $transactionContext = null;
+    /** @var list<array{Model, bool}> */
+    private array $transactionNotifications = [];
 
-    /** Queue Model writes and commit them with one saveChanges(). Returns the callback result. */
+    /**
+     * Save Models immediately (including generated IDs), then commit all writes together.
+     * On rollback, discard/reload participating Models: PHP state is not rewound.
+     */
     public function transaction(callable $callback): mixed
     {
-        if ($this->pending !== null || $this->pdo->inTransaction()) {
+        if ($this->transactionContext !== null || $this->pdo->inTransaction()) {
             throw new \LogicException('Nested or externally opened transactions are not supported.');
         }
-        $this->pending = [];
+        $context = new ModelDbContext($this->pdo);
+        $context->database->beginTransaction();
+        $this->transactionContext = $context;
+        $this->transactionNotifications = [];
         try {
             $result = $callback();
-            $pending = $this->pendingWrites();
-            if ($pending !== []) {
-                $mappings = [];
-                foreach ($pending as [$model]) {
-                    $mappings[$model::class] = $this->metadata($model::class);
-                }
-                $context = new ModelDbContext($this->pdo, ...array_values($mappings));
-                try {
-                    foreach ($pending as [$model, $delete]) {
-                        $model->stageWrite($context, $delete);
-                    }
-                    $context->saveChanges();
-                    $notifications = [];
-                    foreach ($pending as [$model, $delete]) {
-                        if ($model->completeWrite($delete)) $notifications[] = [$model, $delete];
-                    }
-                    foreach ($notifications as [$model, $delete]) {
-                        $model->notifyPersistence($delete);
-                    }
-                } finally {
-                    foreach ($pending as [$model]) {
-                        $context->entry($model)->state = \Light\Entity\EntityState::Detached;
-                        $model->attachRelations($context, $this->metadata($model::class), \Light\Entity\QueryTrackingBehavior::NoTracking);
-                    }
-                }
+            $context->database->commitTransaction();
+            $notifications = $this->persistenceNotifications();
+        } catch (\Throwable $error) {
+            if ($context->database->inTransaction()) {
+                try { $context->database->rollbackTransaction(); }
+                catch (\Throwable) { /* Preserve the original callback/commit exception. */ }
             }
-            return $result;
+            throw $error;
         } finally {
-            $this->pending = null;
+            $this->transactionContext = null;
+            $this->transactionNotifications = [];
+        }
+        // Hook failures happen after commit and must not trigger rollback.
+        foreach ($notifications as [$model, $deleted]) { $model->notifyPersistence($deleted); }
+        return $result;
+    }
+
+    /** @internal Immediate saves accept state now, but notify hooks only after outer commit. */
+    public function notifyPersistence(Model $model, bool $deleted): void
+    {
+        if ($this->transactionContext !== null) {
+            $this->transactionNotifications[] = [$model, $deleted];
+        } else {
+            $model->notifyPersistence($deleted);
         }
     }
 
-    /** @return array<int, array{Model, bool}> */
-    private function pendingWrites(): array { return $this->pending ?? []; }
-
-    /** @internal Immediate bulk writes cannot participate in deferred Model transactions. */
-    public function assertImmediateWritesAllowed(): void
-    {
-        if ($this->pending !== null) {
-            throw new \LogicException('Bulk writes are not supported inside a deferred Model transaction.');
-        }
-    }
-
-    /** @internal Returns true when the write has been deferred. Last operation per Model wins. */
-    public function deferWrite(Model $model, bool $delete): bool
-    {
-        if ($this->pending === null) { return false; }
-        $this->pending[spl_object_id($model)] = [$model, $delete];
-        return true;
-    }
-
+    /** @return list<array{Model, bool}> */
+    private function persistenceNotifications(): array { return $this->transactionNotifications; }
 
     public function __construct(private readonly PDO $pdo)
     {
@@ -117,10 +102,20 @@ final class Database
         return $context->set($class)->asNoTracking();
     }
 
+    /** @internal Detach each completed/failed save so later saves cannot flush it again. */
+    public function releaseWriteContext(DbContext $context, Model $model, EntityMapping $mapping): void
+    {
+        $context->changeTracker->setState($mapping, $model, \Light\Entity\EntityState::Detached);
+        // Keep fresh, convention-aware relationship reads separate from the shared
+        // write context, which discovers each Model mapping as writes are staged.
+        $relations = $context === $this->transactionContext ? new ModelDbContext($this->pdo, $mapping) : $context;
+        $model->attachRelations($relations, $mapping, \Light\Entity\QueryTrackingBehavior::NoTracking);
+    }
+
     /** @internal One Model save must not flush changes belonging to another Model. */
     public function writeContext(EntityMapping $mapping): DbContext
     {
-        return new ModelDbContext($this->pdo, $mapping);
+        return $this->transactionContext ?? new ModelDbContext($this->pdo, $mapping);
     }
 
     public function clearMetadata(): void
