@@ -15,6 +15,69 @@ final class Database
     private ModelMetadata $metadata;
     /** @var array<class-string<Model>, DbContext> */
     private array $contexts = [];
+    /** @var array<int, array{Model, bool}>|null */
+    private ?array $pending = null;
+
+    /** Queue Model writes and commit them with one saveChanges(). Returns the callback result. */
+    public function transaction(callable $callback): mixed
+    {
+        if ($this->pending !== null || $this->pdo->inTransaction()) {
+            throw new \LogicException('Nested or externally opened transactions are not supported.');
+        }
+        $this->pending = [];
+        try {
+            $result = $callback();
+            $pending = $this->pendingWrites();
+            if ($pending !== []) {
+                $mappings = [];
+                foreach ($pending as [$model]) {
+                    $mappings[$model::class] = $this->metadata($model::class);
+                }
+                $context = new ModelDbContext($this->pdo, ...array_values($mappings));
+                try {
+                    foreach ($pending as [$model, $delete]) {
+                        $model->stageWrite($context, $delete);
+                    }
+                    $context->saveChanges();
+                    $notifications = [];
+                    foreach ($pending as [$model, $delete]) {
+                        if ($model->completeWrite($delete)) $notifications[] = [$model, $delete];
+                    }
+                    foreach ($notifications as [$model, $delete]) {
+                        $model->notifyPersistence($delete);
+                    }
+                } finally {
+                    foreach ($pending as [$model]) {
+                        $context->entry($model)->state = \Light\Entity\EntityState::Detached;
+                        $model->attachRelations($context, $this->metadata($model::class), \Light\Entity\QueryTrackingBehavior::NoTracking);
+                    }
+                }
+            }
+            return $result;
+        } finally {
+            $this->pending = null;
+        }
+    }
+
+    /** @return array<int, array{Model, bool}> */
+    private function pendingWrites(): array { return $this->pending ?? []; }
+
+    /** @internal Immediate bulk writes cannot participate in deferred Model transactions. */
+    public function assertImmediateWritesAllowed(): void
+    {
+        if ($this->pending !== null) {
+            throw new \LogicException('Bulk writes are not supported inside a deferred Model transaction.');
+        }
+    }
+
+    /** @internal Returns true when the write has been deferred. Last operation per Model wins. */
+    public function deferWrite(Model $model, bool $delete): bool
+    {
+        if ($this->pending === null) { return false; }
+        $this->pending[spl_object_id($model)] = [$model, $delete];
+        return true;
+    }
+
 
     public function __construct(private readonly PDO $pdo)
     {

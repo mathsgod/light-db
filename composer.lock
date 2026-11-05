@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "95c639032f133c77e68281a1ae19f43d",
+    "content-hash": "6d52e30dbcf6e82338ff11003f22517b",
     "packages": [
         {
             "name": "graham-campbell/result-type",
@@ -107,11 +107,17 @@
         },
         {
             "name": "mathsgod/light-entity",
-            "version": "dev-main",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mathsgod/light-entity.git",
+                "reference": "16e1e1a73972ad975e117d10eca814a2b8ee58b0"
+            },
             "dist": {
-                "type": "path",
-                "url": "../light-entity",
-                "reference": "2064f7f64fe4cad2bd6f26ed6670101f3df3a873"
+                "type": "zip",
+                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/16e1e1a73972ad975e117d10eca814a2b8ee58b0",
+                "reference": "16e1e1a73972ad975e117d10eca814a2b8ee58b0",
+                "shasum": ""
             },
             "require": {
                 "ext-pdo": "*",
@@ -128,27 +134,16 @@
                     "Light\\Entity\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Light\\Entity\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "test": [
-                    "phpunit"
-                ],
-                "test:mysql": [
-                    "bash tests/integration/run-mysql.sh"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
             "description": "A PDO-based entity ORM built on light-linq",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/mathsgod/light-entity/issues",
+                "source": "https://github.com/mathsgod/light-entity/tree/v1.0.0"
+            },
+            "time": "2026-11-05T02:33:17+00:00"
         },
         {
             "name": "mathsgod/light-linq",
@@ -2385,9 +2380,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "mathsgod/light-entity": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

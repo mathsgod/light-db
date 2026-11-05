@@ -143,9 +143,38 @@ another Model's unsaved changes. Primary-key and computed-column modifications
 are rejected. Deleted Models cannot be saved again. `exists()`, `isDirty()`,
 `toArray()`, `_id()` and `_key()` provide basic Model introspection.
 
-Multi-Model transaction coordination and adopting externally opened PDO
-transactions are not implemented yet; the native persistence layer rejects such
-saves before executing writes. `Include`/relationship conventions, GraphQL mapper
+`Database::transaction()` groups Model writes into one light-entity unit of work:
+
+```php
+$db = Database::getDefault();
+$user = User::Get(1); // Models loaded before the callback also work.
+$result = $db->transaction(function () use ($user) {
+    $user->name = 'Mary';
+    $user->save();
+    $other = User::Create(['name' => 'Ada']);
+    $other->save();
+    return 'done';
+});
+```
+
+Within the callback, `save()` and `delete()` enqueue writes and return `0`;
+no Model SQL writes execute until the callback returns. One `saveChanges()`
+commits all queued Models atomically. The transaction returns the callback result.
+Generated IDs/defaults and Model persistence snapshots update after commit.
+Reads during the callback see database values, not queued changes. Repeated writes
+of the same instance use its final values and last operation; save then delete
+of a new Model cancels its insert. Only explicitly queued Models participate.
+Models must belong to this Database; writes through another Database are independent.
+
+Callback exceptions discard queued operations. Commit failures roll back all writes;
+caller edits remain dirty and can be retried. Nested transactions and existing PDO
+transactions are rejected. Query bulk update/delete are rejected within the callback;
+raw PDO writes are outside this deferred transaction and must not be mixed with it.
+Automatic relationship/key propagation between new Models is not provided by this
+API: generated IDs are unavailable until commit. Outside the callback, Model writes
+remain immediate and isolated.
+
+`Include`/relationship conventions, GraphQL mapper
 integration, joins/projection wrappers, legacy `wasChanged()`/audit hooks and
 schema-management wrappers are also outside this first core implementation.
 The old Laminas Query/Predicate API is intentionally not emulated.
@@ -173,8 +202,8 @@ Benchmarks and before/after results: [query → JSON](benchmarks/query-json/READ
 
 ## Tests
 
-PHP >= 8.3 is required. This development checkout uses the sibling light-entity
-package through a Composer path repository.
+PHP >= 8.3 is required. Composer installs the published light-entity 1.x package;
+no sibling checkout or local path repository is required.
 
 ```bash
 composer install
@@ -238,3 +267,13 @@ loaded by ignoring a filter. Soft-delete writes require separate application log
 `CurrentTenant` above represents your application's tenant resolver. Ordinary
 queries without queryFilterDefinitions retain their existing behavior. Full native
 filter and relationship semantics are documented in light-entity's README.
+
+### Persistence extension hook
+
+Model subclasses may override `protected function afterPersistence(bool $deleted): void`
+to run work after a successful write commits. Deferred transactions invoke hooks only
+after all queued Models have accepted their committed state. Hooks do not run for
+failed writes or a cancelled new-Model insert. A hook exception propagates after the
+database commit; it does not roll back data. External writes made by a hook are not
+part of the original transaction. The protected `database()` accessor returns the
+Database bound to that Model, even if the application changes its default.
