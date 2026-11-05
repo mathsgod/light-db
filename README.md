@@ -4,6 +4,8 @@ A small Active Record layer over light-entity. The runtime consists of four
 classes: `Database`, `Model`, `Query`, and `ModelMetadata`. It has no Laminas,
 Illuminate Collection, paginator, or GraphQL dependency.
 
+Upgrading from 1.x: see the [v2 migration guide](docs/migration-v2.md).
+
 ```php
 use Light\Db\{Database, Model};
 
