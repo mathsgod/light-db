@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Restore immediate `save()` / `delete()` inside `Database::transaction()`.
+  Generated IDs/defaults and same-connection reads are available in the callback;
+  Model, Query bulk, and raw PDO writes commit or roll back together.
+- Revert the deferred-transaction regression introduced by `8b34f99` and shipped
+  in v2.2.0. Keep v2.1/v2.2 query, projection, closure and LIKE improvements.
+- Keep post-persistence hooks after the outer commit, and discard them on rollback.
+  Previously accepted PHP Model state is not rewound by an outer rollback;
+  discard/reload participating Models before retrying.
+
 ## v2.2.0 — 2026-11-06
 
 ## Transaction behavior changes

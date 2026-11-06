@@ -233,7 +233,6 @@ final class Query implements \IteratorAggregate, \Countable
     public function max(string $field): mixed { return $this->set->asQueryable()->max($this->field($field)); }
     private function validateWrite(): void
     {
-        $this->database->assertImmediateWritesAllowed();
         if ($this->readOnly) { throw new \LogicException('A read-only Query cannot update or delete records.'); }
         if ($this->limit !== null || $this->offset !== 0) { throw new \LogicException('Bulk writes do not support pagination.'); }
     }

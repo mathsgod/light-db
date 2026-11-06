@@ -88,19 +88,16 @@ abstract class Model extends Entity
         $this->assertWritable();
         if ($this->deleted) { throw new \LogicException('A deleted Model cannot be saved again.'); }
         $mapping = $this->getMapping();
-        if ($this->owner->deferWrite($this, false)) { return 0; }
         $context = $this->owner->writeContext($mapping);
         try {
-            if ($this->persisted) { $context->attach($this, $this->original); }
-            else { $context->add(static::class, $this); }
+            $this->stageWrite($context, false);
             $count = $context->saveChanges();
         } finally {
-            $context->entry($this)->state = EntityState::Detached;
-            $this->attachRelations($context, $mapping, \Light\Entity\QueryTrackingBehavior::NoTracking);
+            $this->owner->releaseWriteContext($context, $this, $mapping);
         }
         $this->persisted = true;
         $this->original = $mapping->snapshotEntity($this);
-        $this->afterPersistence(false);
+        $this->owner->notifyPersistence($this, false);
         return $count;
     }
 
@@ -109,45 +106,35 @@ abstract class Model extends Entity
         $this->assertWritable();
         if ($this->deleted) { return 0; }
         $mapping = $this->getMapping();
-        if ($this->owner->deferWrite($this, true)) { return 0; }
         if (!$this->persisted) { return 0; }
         $context = $this->owner->writeContext($mapping);
         try {
-            $context->attach($this, $this->original);
-            $context->remove(static::class, $this);
+            $this->stageWrite($context, true);
             $count = $context->saveChanges();
         } finally {
-            $context->entry($this)->state = EntityState::Detached;
-            $this->attachRelations($context, $mapping, \Light\Entity\QueryTrackingBehavior::NoTracking);
+            $this->owner->releaseWriteContext($context, $this, $mapping);
         }
         $this->persisted = false; $this->deleted = true;
-        $this->afterPersistence(true);
+        $this->owner->notifyPersistence($this, true);
         return $count;
     }
 
-    /** @internal Register this Model using its original model-value snapshot. */
-    final public function stageWrite(\Light\Entity\DbContext $context, bool $delete): void
+    /** Register this Model using its original model-value snapshot. */
+    private function stageWrite(\Light\Entity\DbContext $context, bool $delete): void
     {
         $this->assertWritable();
+        // Supply the exact Active Record mapping even when a new Model class is
+        // first encountered midway through a shared immediate transaction.
+        $mapping = $this->getMapping();
         if ($this->persisted) {
-            $context->attach($this, $this->original);
-            if ($delete) { $context->remove(static::class, $this); }
+            $context->changeTracker->attach($mapping, $this, $this->original);
+            if ($delete) { $context->changeTracker->setState($mapping, $this, EntityState::Deleted); }
         } elseif (!$delete) {
-            $context->add(static::class, $this);
+            $context->changeTracker->add($mapping, $this);
         }
     }
 
-    /** @internal Called only after the entire unit of work commits. */
-    final public function completeWrite(bool $delete): bool
-    {
-        $wasPersisted = $this->persisted;
-        $this->persisted = !$delete;
-        $this->deleted = $delete;
-        if (!$delete) { $this->original = $this->getMapping()->snapshotEntity($this); }
-        return !$delete || $wasPersisted;
-    }
-
-    /** @internal Invoke hooks only after every queued Model has accepted its commit. */
+    /** @internal Invoke hooks after persistence, or after the outer transaction commits. */
     final public function notifyPersistence(bool $deleted): void
     {
         $this->afterPersistence($deleted);
