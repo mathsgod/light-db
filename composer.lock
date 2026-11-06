@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dafb020bfd7282d56f2e54b89be6a316",
+    "content-hash": "2427b7d7e68554319f84092b70f633d3",
     "packages": [
         {
             "name": "graham-campbell/result-type",
@@ -107,16 +107,16 @@
         },
         {
             "name": "mathsgod/light-entity",
-            "version": "v1.2.0-RC1",
+            "version": "v1.2.0-RC2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/light-entity.git",
-                "reference": "208d5892a45d7ea46d5b9c7d9742076b075e5341"
+                "reference": "77995c39607bfa27d442f29d1022e704f2b735b9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/208d5892a45d7ea46d5b9c7d9742076b075e5341",
-                "reference": "208d5892a45d7ea46d5b9c7d9742076b075e5341",
+                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/77995c39607bfa27d442f29d1022e704f2b735b9",
+                "reference": "77995c39607bfa27d442f29d1022e704f2b735b9",
                 "shasum": ""
             },
             "require": {
@@ -141,9 +141,9 @@
             "description": "A PDO-based entity ORM built on light-linq",
             "support": {
                 "issues": "https://github.com/mathsgod/light-entity/issues",
-                "source": "https://github.com/mathsgod/light-entity/tree/v1.2.0-RC1"
+                "source": "https://github.com/mathsgod/light-entity/tree/v1.2.0-RC2"
             },
-            "time": "2026-11-06T04:45:44+00:00"
+            "time": "2026-11-06T04:51:14+00:00"
         },
         {
             "name": "mathsgod/light-linq",
