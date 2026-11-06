@@ -88,8 +88,10 @@ a pattern. Conditions and order fields are validated against mapped columns.
 `whereIn()` and `whereNotIn()` accept a value list or a single-column light-entity
 `IQueryable` subquery. Lists follow the same conversion and validation rules as
 `where(['id' => ['in' => $ids]])`; an empty IN list matches no rows, while an empty
-NOT IN list matches all rows. Subqueries must use the same query provider as the
-outer query (the same Database and Model set); SQL NULL semantics apply to them.
+NOT IN list matches all rows. Subqueries may select from a different Model as
+long as both queries share the exact same PDO connection. Each Model's global
+filters are preserved; SQL NULL semantics apply to subqueries. This requires
+the light-entity cross-context IN support, which is not included in RC2.
 
 ```php
 $users = User::Query()->whereIn('id', [1, 2, 3])->toArray();
@@ -97,6 +99,9 @@ $others = User::Query()->whereNotIn('id', [1, 2, 3])->toArray();
 $ids = $db->set(User::class)->where(['age' => ['gte' => 18]])
     ->select(\Light\Linq\Expr::field('id'));
 $adults = User::Query()->whereIn('id', $ids)->toArray();
+
+$serverIds = $db->set(ServerIP::class)->select(\Light\Linq\Expr::field('server_id'));
+$servers = Server::Query()->whereIn('server_id', $serverIds)->toArray();
 ```
 
 Use `orderByRaw()` to sort by a trusted scalar SQL expression or correlated

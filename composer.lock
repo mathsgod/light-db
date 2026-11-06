@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2427b7d7e68554319f84092b70f633d3",
+    "content-hash": "28466128204f987fa47a699564ede8a7",
     "packages": [
         {
             "name": "graham-campbell/result-type",
@@ -107,16 +107,16 @@
         },
         {
             "name": "mathsgod/light-entity",
-            "version": "v1.2.0-RC2",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/light-entity.git",
-                "reference": "77995c39607bfa27d442f29d1022e704f2b735b9"
+                "reference": "34510f3a454ccf37a29bbe0d8b0ce9c9bc4d5c29"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/77995c39607bfa27d442f29d1022e704f2b735b9",
-                "reference": "77995c39607bfa27d442f29d1022e704f2b735b9",
+                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/34510f3a454ccf37a29bbe0d8b0ce9c9bc4d5c29",
+                "reference": "34510f3a454ccf37a29bbe0d8b0ce9c9bc4d5c29",
                 "shasum": ""
             },
             "require": {
@@ -128,6 +128,7 @@
                 "mathsgod/light-collections": "^1.0",
                 "phpunit/phpunit": "^12.5"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -141,9 +142,9 @@
             "description": "A PDO-based entity ORM built on light-linq",
             "support": {
                 "issues": "https://github.com/mathsgod/light-entity/issues",
-                "source": "https://github.com/mathsgod/light-entity/tree/v1.2.0-RC2"
+                "source": "https://github.com/mathsgod/light-entity/tree/main"
             },
-            "time": "2026-11-06T04:51:14+00:00"
+            "time": "2026-11-06T07:00:54+00:00"
         },
         {
             "name": "mathsgod/light-linq",
@@ -2382,7 +2383,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "mathsgod/light-entity": 5
+        "mathsgod/light-entity": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
