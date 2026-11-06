@@ -85,6 +85,20 @@ String convenience operators escape literal wildcard characters; `like` accepts
 a pattern. Conditions and order fields are validated against mapped columns.
 `whereRaw()` takes trusted SQL and separate scalar provider-value parameters.
 
+`whereIn()` and `whereNotIn()` accept a value list or a single-column light-entity
+`IQueryable` subquery. Lists follow the same conversion and validation rules as
+`where(['id' => ['in' => $ids]])`; an empty IN list matches no rows, while an empty
+NOT IN list matches all rows. Subqueries must use the same query provider as the
+outer query (the same Database and Model set); SQL NULL semantics apply to them.
+
+```php
+$users = User::Query()->whereIn('id', [1, 2, 3])->toArray();
+$others = User::Query()->whereNotIn('id', [1, 2, 3])->toArray();
+$ids = $db->set(User::class)->where(['age' => ['gte' => 18]])
+    ->select(\Light\Linq\Expr::field('id'));
+$adults = User::Query()->whereIn('id', $ids)->toArray();
+```
+
 Use `orderByRaw()` to sort by a trusted scalar SQL expression or correlated
 subquery. It accepts positional or named provider-value parameters and appends
 to existing ordering, just like `orderBy()`:

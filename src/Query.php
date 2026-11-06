@@ -57,6 +57,24 @@ final class Query implements \IteratorAggregate, \Countable
     }
 
     /** @return self<T> */
+    public function whereIn(string $field, array|\Light\Linq\IQueryable $values): self
+    {
+        if (is_array($values)) { return $this->where([$field => ['in' => $values]]); }
+        $copy = clone $this;
+        $copy->set = $this->set->whereIn($this->field($field), $values);
+        return $copy;
+    }
+
+    /** @return self<T> */
+    public function whereNotIn(string $field, array|\Light\Linq\IQueryable $values): self
+    {
+        if (is_array($values)) { return $this->where([$field => ['notIn' => $values]]); }
+        $copy = clone $this;
+        $copy->set = $this->set->whereNotIn($this->field($field), $values);
+        return $copy;
+    }
+
+    /** @return self<T> */
     public function filters(?array $filters): self
     {
         $query = $this;
