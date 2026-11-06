@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.2.1 — 2026-11-06
 
 ### Fixed
 
@@ -12,6 +12,12 @@
 - Keep post-persistence hooks after the outer commit, and discard them on rollback.
   Previously accepted PHP Model state is not rewound by an outer rollback;
   discard/reload participating Models before retrying.
+
+### Validation
+
+- SQLite and MySQL: 129 tests, 988 assertions each, no skips.
+- PHPStan level 5 passed.
+- Application integration suite: 146 tests, 602 assertions, no skips.
 
 ## v2.2.0 — 2026-11-06
 

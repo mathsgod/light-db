@@ -32,10 +32,10 @@ $user->save();
 $user->delete();
 ```
 
-## Transaction regression in v2.2.0
+## v2.2.1
 
 v2.2.0 inadvertently reintroduced deferred Model writes inside transactions.
-This unreleased fix restores immediate `save()`/`delete()`: generated IDs/defaults
+v2.2.1 restores immediate `save()`/`delete()`: generated IDs/defaults
 are available inside the callback, and Model, Query bulk and raw PDO writes on the
 same connection commit or roll back together. The published v2.2.0 tag is unchanged.
 See [the changelog](CHANGELOG.md) and [transaction migration guidance](docs/migration-v2.md#7-group-immediate-model-writes-with-transaction).
