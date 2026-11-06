@@ -85,6 +85,21 @@ String convenience operators escape literal wildcard characters; `like` accepts
 a pattern. Conditions and order fields are validated against mapped columns.
 `whereRaw()` takes trusted SQL and separate scalar provider-value parameters.
 
+`select()` returns a light-linq `Queryable` containing scalar values for one
+column, or associative rows for multiple columns. It preserves filters, ordering
+and pagination, and does not hydrate Models. It also accepts a single
+`ValueExpression`, such as `Expr::fields('server_id', 'name')`.
+
+```php
+$ids = Server::Query()->select('server_id')->toArray();
+$rows = Server::Query()->select('server_id', 'name')->toArray();
+$serverIds = ServerIP::Query()->select('server_id');
+$servers = Server::Query()->whereIn('server_id', $serverIds)->toArray();
+```
+
+Apply Model query methods before `select()`; after it, use light-linq methods
+with expressions. String column names are validated against mapped properties.
+
 `whereIn()` and `whereNotIn()` accept a value list or a single-column light-entity
 `IQueryable` subquery. Lists follow the same conversion and validation rules as
 `where(['id' => ['in' => $ids]])`; an empty IN list matches no rows, while an empty

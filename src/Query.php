@@ -167,6 +167,30 @@ final class Query implements \IteratorAggregate, \Countable
     public function take(int $count): self { return $this->limit($count); }
     /** @return self<T> */
     public function skip(int $count): self { return $this->offset($count); }
+    /**
+     * Project one column to scalar values, or multiple columns to associative rows.
+     * Returns an untracked query that can also be used as an IN subquery.
+     */
+    public function select(string|ValueExpression ...$columns): \Light\Linq\Queryable
+    {
+        if ($columns === []) {
+            throw new \InvalidArgumentException('select() requires at least one column or expression.');
+        }
+        if (count($columns) === 1 && $columns[0] instanceof ValueExpression) {
+            return $this->page()->select($columns[0]);
+        }
+        $names = [];
+        foreach ($columns as $column) {
+            if (!is_string($column)) {
+                throw new \InvalidArgumentException('Pass column names or a single projection expression to select().');
+            }
+            $this->field($column);
+            $names[] = $column;
+        }
+        $selector = count($names) === 1 ? $this->field($names[0]) : Expr::fields(...$names);
+        return $this->page()->select($selector);
+    }
+
     private function page(): DbSet
     {
         $set = $this->offset > 0 ? $this->set->skip($this->offset) : $this->set;
