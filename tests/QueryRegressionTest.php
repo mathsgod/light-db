@@ -12,6 +12,19 @@ class RegressionUser extends Model { protected static $_table = 'User'; }
 class OtherRegressionUser extends Model { protected static $_table = 'User'; }
 class PlainRegressionUser extends Model { protected static $_table = 'plain_users'; }
 
+class LikeConvertedRegressionUser extends Model
+{
+    protected static $_table = 'User';
+    public static int $likeConversionCalls = 0;
+    public static function valueConverters(): array
+    {
+        return ['name' => new \Light\Entity\ValueConverter(
+            function ($value) { ++self::$likeConversionCalls; return strtolower($value); },
+            fn ($value) => $value,
+        )];
+    }
+}
+
 final class QueryRegressionTest extends DatabaseTestCase
 {
     public static function filters(): iterable
@@ -104,6 +117,33 @@ final class QueryRegressionTest extends DatabaseTestCase
         self::assertSame(4, RegressionUser::Query()->where(['name'=>['startsWith'=>'%_!']])->first()->id);
         self::assertSame(5, RegressionUser::Query()->where(['name'=>['endsWith'=>'%_!']])->first()->id);
         self::assertSame(0, RegressionUser::Query()->where(['name'=>['contains'=>"' OR 1=1 --"]])->count());
+    }
+
+    public function testStringFilterBuildsNativeLikeExpressionAndBindsPattern(): void
+    {
+        $query = RegressionUser::Query()->where(['name' => ['contains' => '%_!']])->select('id');
+        $where = $query->expression()->source;
+        self::assertInstanceOf(\Light\Entity\Sql\LikeExpression::class, $where->arguments['predicate']);
+        $compiled = $query->provider()->compile($query->expression());
+        self::assertSame(['%!%!_!!%', '!'], array_values($compiled->parameters));
+        self::assertStringContainsString(' LIKE :p0 ESCAPE :p1', $compiled->sql);
+    }
+
+    public function testLikeFiltersPreserveValueConversionExactlyOnce(): void
+    {
+        LikeConvertedRegressionUser::$likeConversionCalls = 0;
+        $query = LikeConvertedRegressionUser::Query()->where(['name' => ['contains' => 'ADA']])->select('id');
+        $compiled = $query->provider()->compile($query->expression());
+        self::assertSame(['%ada%', '!'], array_values($compiled->parameters));
+        self::assertSame([1], $query->toArray());
+        self::assertSame(1, LikeConvertedRegressionUser::$likeConversionCalls);
+    }
+
+    public function testLikeExpressionsComposeWithNegationAndLogicalGroups(): void
+    {
+        self::assertSame([2], RegressionUser::Query()->where(['_not' => ['name' => ['endsWith' => 'a']]])->select('id')->toArray());
+        self::assertSame([1, 3], RegressionUser::Query()->where(['_or' => [['name' => ['contains' => 'd']], ['id' => 3]]])
+            ->orderBy('id')->select('id')->toArray());
     }
 
     public function testOneHundredPlainRecordsMatchPdoAndSupportBothQueryModes(): void

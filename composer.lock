@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "afba0b2979bc6289901ab82032501ca9",
+    "content-hash": "7ca5be8f43f1317b196cd47dc28111e2",
     "packages": [
         {
             "name": "graham-campbell/result-type",
@@ -107,28 +107,27 @@
         },
         {
             "name": "mathsgod/light-entity",
-            "version": "dev-main",
+            "version": "v1.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/light-entity.git",
-                "reference": "34510f3a454ccf37a29bbe0d8b0ce9c9bc4d5c29"
+                "reference": "1b4c99ea7e0823b355590eda740fd8e7b5acff15"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/34510f3a454ccf37a29bbe0d8b0ce9c9bc4d5c29",
-                "reference": "34510f3a454ccf37a29bbe0d8b0ce9c9bc4d5c29",
+                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/1b4c99ea7e0823b355590eda740fd8e7b5acff15",
+                "reference": "1b4c99ea7e0823b355590eda740fd8e7b5acff15",
                 "shasum": ""
             },
             "require": {
                 "ext-pdo": "*",
-                "mathsgod/light-linq": "^1.1",
+                "mathsgod/light-linq": "^1.2",
                 "php": ">=8.3"
             },
             "require-dev": {
                 "mathsgod/light-collections": "^1.0",
                 "phpunit/phpunit": "^12.5"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -142,22 +141,22 @@
             "description": "A PDO-based entity ORM built on light-linq",
             "support": {
                 "issues": "https://github.com/mathsgod/light-entity/issues",
-                "source": "https://github.com/mathsgod/light-entity/tree/main"
+                "source": "https://github.com/mathsgod/light-entity/tree/v1.2.0"
             },
-            "time": "2026-11-06T07:00:54+00:00"
+            "time": "2026-11-06T09:19:02+00:00"
         },
         {
             "name": "mathsgod/light-linq",
-            "version": "v1.1.0",
+            "version": "v1.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/light-linq.git",
-                "reference": "f0083991b46fa6cda9560a5e9d91fe1314f7cc46"
+                "reference": "10db33bc5852115000336b07a880560dcb62dbd0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/light-linq/zipball/f0083991b46fa6cda9560a5e9d91fe1314f7cc46",
-                "reference": "f0083991b46fa6cda9560a5e9d91fe1314f7cc46",
+                "url": "https://api.github.com/repos/mathsgod/light-linq/zipball/10db33bc5852115000336b07a880560dcb62dbd0",
+                "reference": "10db33bc5852115000336b07a880560dcb62dbd0",
                 "shasum": ""
             },
             "require": {
@@ -181,9 +180,9 @@
             "description": "A provider-based LINQ-style query library for PHP",
             "support": {
                 "issues": "https://github.com/mathsgod/light-linq/issues",
-                "source": "https://github.com/mathsgod/light-linq/tree/v1.1.0"
+                "source": "https://github.com/mathsgod/light-linq/tree/v1.2.0"
             },
-            "time": "2026-11-06T04:24:38+00:00"
+            "time": "2026-11-06T09:16:31+00:00"
         },
         {
             "name": "nikic/php-parser",
@@ -2382,9 +2381,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "mathsgod/light-entity": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

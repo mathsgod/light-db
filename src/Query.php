@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Light\Db;
 
 use Light\Entity\{DbSet, EntityMapping};
-use Light\Entity\Sql\{MySqlDialect, NotExpression, RawSqlPredicateExpression, SqliteDialect};
+use Light\Entity\Sql\{LikeExpression, NotExpression};
 use Light\Linq\{Enumerable, Expr, IEnumerable};
 use Light\Linq\Expressions\ValueExpression;
 
@@ -44,7 +44,7 @@ final class Query implements \IteratorAggregate, \Countable
 
     public function getClassName(): string { return $this->class; }
     /** @return self<T> */
-    public function where(ValueExpression|array $condition): self
+    public function where(ValueExpression|array|\Closure $condition): self
     {
         $copy = clone $this;
         $copy->set = $this->set->where(is_array($condition) ? $this->expression($condition) : $condition);
@@ -168,21 +168,21 @@ final class Query implements \IteratorAggregate, \Countable
     /** @return self<T> */
     public function skip(int $count): self { return $this->offset($count); }
     /**
-     * Project one column to scalar values, or multiple columns to associative rows.
+     * Project named columns, a single value expression, or a translated closure.
      * Returns an untracked query that can also be used as an IN subquery.
      */
-    public function select(string|ValueExpression ...$columns): \Light\Linq\Queryable
+    public function select(string|ValueExpression|\Closure ...$columns): \Light\Linq\Queryable
     {
         if ($columns === []) {
             throw new \InvalidArgumentException('select() requires at least one column or expression.');
         }
-        if (count($columns) === 1 && $columns[0] instanceof ValueExpression) {
+        if (count($columns) === 1 && ($columns[0] instanceof ValueExpression || $columns[0] instanceof \Closure)) {
             return $this->page()->select($columns[0]);
         }
         $names = [];
         foreach ($columns as $column) {
             if (!is_string($column)) {
-                throw new \InvalidArgumentException('Pass column names or a single projection expression to select().');
+                throw new \InvalidArgumentException('Pass column names or a single projection expression or closure to select().');
             }
             $this->field($column);
             $names[] = $column;
@@ -287,8 +287,11 @@ final class Query implements \IteratorAggregate, \Countable
                     $pattern = $operator === 'like' ? $value : str_replace(['!','%','_'],['!!','!%','!_'],$value);
                     if (in_array($operator,['contains','endsWith'],true)) { $pattern = '%'.$pattern; }
                     if (in_array($operator,['contains','startsWith'],true)) { $pattern .= '%'; }
-                    $dialect = $this->database->connection()->getAttribute(\PDO::ATTR_DRIVER_NAME)==='mysql' ? new MySqlDialect() : new SqliteDialect();
-                    $parts[] = new RawSqlPredicateExpression($dialect->quoteIdentifier($name)." LIKE ? ESCAPE '!'",[$this->mapping->toProviderValue($name,$pattern)]);
+                    $parts[] = new LikeExpression(
+                        $field,
+                        Expr::value($this->mapping->toProviderValue($name, $pattern)),
+                        '!',
+                    );
                 } else { throw new \InvalidArgumentException('Unknown filter operator: '.$operator); }
             }
         }

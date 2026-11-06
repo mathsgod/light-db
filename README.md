@@ -32,6 +32,12 @@ $user->save();
 $user->delete();
 ```
 
+## v2.1.0
+
+Requires light-entity `^1.2` and its transitive light-linq `^1.2` dependency.
+Adds translated query closures and native LIKE expression filters.
+See [CHANGELOG](CHANGELOG.md).
+
 ## Conventions and metadata
 
 The default table name is the exact short class name (`User` maps to `User`).
@@ -77,18 +83,24 @@ $names = User::Query()->asEnumerable()->select(fn ($user) => $user->name)->toArr
 ```
 
 Queries are immutable: keep the returned Query when adding conditions, sorting
-or pagination. `where()` accepts condition maps or light-linq expressions.
+or pagination. `where()` accepts condition maps, light-linq expressions, or
+restricted query closures translated by light-entity. `Model::Query()` also
+accepts an initial closure.
 Operators include `eq`, `neq`/`ne`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`,
 `between`, `notBetween`, `null`, `notNull`, `like`, `contains`, `startsWith`,
 `endsWith`, with optional leading `_`. Logical groups use `_and`, `_or`, `_not`.
 String convenience operators escape literal wildcard characters; `like` accepts
-a pattern. Conditions and order fields are validated against mapped columns.
+a pattern. These filters use light-entity `LikeExpression` nodes, so the query
+provider handles identifier quoting, parameter binding and `ESCAPE`; light-db
+does not build raw SQL for them. Requires a light-entity version containing
+`LikeExpression` (update the application lockfile if necessary). Conditions and order fields are validated against mapped columns.
 `whereRaw()` takes trusted SQL and separate scalar provider-value parameters.
 
 `select()` returns a light-linq `Queryable` containing scalar values for one
 column, or associative rows for multiple columns. It preserves filters, ordering
 and pagination, and does not hydrate Models. It also accepts a single
-`ValueExpression`, such as `Expr::fields('server_id', 'name')`.
+`ValueExpression`, such as `Expr::fields('server_id', 'name')`, or a single
+projection closure. A closure cannot be mixed with additional column selectors.
 
 ```php
 $ids = Server::Query()->select('server_id')->toArray();
@@ -98,15 +110,46 @@ $servers = Server::Query()->whereIn('server_id', $serverIds)->toArray();
 ```
 
 Apply Model query methods before `select()`; after it, use light-linq methods
-with expressions. String column names are validated against mapped properties.
+with expressions or supported query closures. String column names are validated
+against mapped properties.
+
+### Query closures
+
+```php
+$users = User::Query()
+    ->where(fn($user) => $user->status == 'active')
+    ->toArray(); // User Models
+
+$users = User::Query(fn($user) => $user->status == 'active')
+    ->orderBy('id')->toArray();
+
+$rows = User::Query()
+    ->where(fn($user) => $user->status == 'active')
+    ->select(fn($user) => ['id' => $user->id, 'name' => $user->name])
+    ->toArray(); // Untracked associative rows
+```
+
+`where()` forwards the closure to the underlying `DbSet`; light-linq parses its
+PHP source into expressions and light-entity compiles parameterized SQL. It is
+not a per-Model PHP callback. No rows are fetched to evaluate it in PHP.
+`select(fn($user) => $user->name)` returns scalar values. Query immutability,
+global filters, ordering, paging and normal Model materialization are preserved.
+
+light-db v2.1.0 requires light-entity `^1.2`, which requires light-linq `^1.2`.
+Closures support arithmetic, string matching, scalar functions, `??` and full
+ternary expressions with those stable dependencies. Existing applications should
+update their Composer lockfile; no `dev-main` requirement or inline alias is needed.
+
+See [Closure translation](docs/closure-translation.md) for supported entry
+points, dependency requirements, examples and limitations.
 
 `whereIn()` and `whereNotIn()` accept a value list or a single-column light-entity
 `IQueryable` subquery. Lists follow the same conversion and validation rules as
 `where(['id' => ['in' => $ids]])`; an empty IN list matches no rows, while an empty
 NOT IN list matches all rows. Subqueries may select from a different Model as
 long as both queries share the exact same PDO connection. Each Model's global
-filters are preserved; SQL NULL semantics apply to subqueries. This requires
-the light-entity cross-context IN support, which is not included in RC2.
+filters are preserved; SQL NULL semantics apply to subqueries. This uses
+the cross-context IN support included in light-entity v1.2.0.
 
 ```php
 $users = User::Query()->whereIn('id', [1, 2, 3])->toArray();
