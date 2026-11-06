@@ -32,6 +32,14 @@ $user->save();
 $user->delete();
 ```
 
+## v2.2.0
+
+`Database::transaction()` now defers Model writes until its callback completes.
+Inside the callback, `save()`/`delete()` return `0`; generated IDs/defaults are
+available after commit, and queries do not see queued writes. Applications using
+an inserted ID within the callback must adapt before upgrading.
+See [the changelog](CHANGELOG.md) and [transaction migration guidance](docs/migration-v2.md#7-group-model-writes-with-transaction).
+
 ## v2.1.0
 
 Requires light-entity `^1.2` and its transitive light-linq `^1.2` dependency.
