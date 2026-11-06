@@ -235,7 +235,7 @@ the same database is outside its scope.
 
 ## Persistence boundaries
 
-Outside a Database transaction, each Model save/delete uses its own light-entity unit of work and automatic
+Each Model save/delete uses its own light-entity unit of work and automatic
 transaction, preserving the original snapshot and caller's object on failure.
 The tracker attaches the actual Model with its original model-value snapshot;
 no working clone or attribute reassignment is required. Saving one Model never flushes
@@ -243,45 +243,36 @@ another Model's unsaved changes. Primary-key and computed-column modifications
 are rejected. Deleted Models cannot be saved again. `exists()`, `isDirty()`,
 `toArray()`, `_id()` and `_key()` provide basic Model introspection.
 
-`Database::transaction()` executes Model writes immediately and commits them
-atomically when its callback returns. This supports flows where a later write
-needs an earlier insert's generated ID, such as an audit record:
+`Database::transaction()` groups Model writes into one light-entity unit of work:
 
 ```php
 $db = Database::getDefault();
-$id = $db->transaction(function () use ($values) {
-    $user = User::Create($values);
-    $user->save(); // INSERT now; ID, defaults and computed values are available.
-    AuditEvent::Create([
-        'entity_id' => $user->id,
-        'action' => 'create',
-    ])->save();
-    return $user->id;
-}); // Both writes commit here, or both roll back if the callback/commit fails.
+$user = User::Get(1); // Models loaded before the callback also work.
+$result = $db->transaction(function () use ($user) {
+    $user->name = 'Mary';
+    $user->save();
+    $other = User::Create(['name' => 'Ada']);
+    $other->save();
+    return 'done';
+});
 ```
 
-Each `save()`/`delete()` executes immediately and returns its normal write count;
-queries on this Database see those writes before commit. Models loaded before the
-callback participate if bound to the same Database. Saving a Model still does not
-flush other Models' unsaved edits. Repeated saves each execute SQL; saving then
-deleting a new Model inserts and deletes its row within the transaction.
-Query bulk writes and parameterized raw PDO writes on `connection()` also
-participate. Writes through a different connection are independent. Do not
-commit/roll back the connection or execute DDL inside the callback.
+Within the callback, `save()` and `delete()` enqueue writes and return `0`;
+no Model SQL writes execute until the callback returns. One `saveChanges()`
+commits all queued Models atomically. The transaction returns the callback result.
+Generated IDs/defaults and Model persistence snapshots update after commit.
+Reads during the callback see database values, not queued changes. Repeated writes
+of the same instance use its final values and last operation; save then delete
+of a new Model cancels its insert. Only explicitly queued Models participate.
+Models must belong to this Database; writes through another Database are independent.
 
-Each Model save uses a savepoint. An uncaught save exception rolls back the whole
-transaction; if the callback deliberately catches it, only that failed save is
-rolled back and the callback may continue. Nested transactions and externally
-opened transactions are rejected.
-
-After rollback, database changes are undone, but already accepted PHP Model state
-(including generated IDs, `exists()` and original snapshots) is **not** rewound.
-Discard those instances and obtain fresh Models before retrying; for rolled-back
-inserts, create a new Model. This matches light-entity's explicit transaction
-semantics. Persistence hooks run after the outer commit, once for each successful
-Model save/delete in call order, and are discarded on rollback. Hooks see the
-Model's final state, not a per-save copy; hook failures cannot undo committed data.
-Keep audit writes that must be atomic inside the callback, rather than in hooks.
+Callback exceptions discard queued operations. Commit failures roll back all writes;
+caller edits remain dirty and can be retried. Nested transactions and existing PDO
+transactions are rejected. Query bulk update/delete are rejected within the callback;
+raw PDO writes are outside this deferred transaction and must not be mixed with it.
+Automatic relationship/key propagation between new Models is not provided by this
+API: generated IDs are unavailable until commit. Outside the callback, Model writes
+remain immediate and isolated.
 
 `Include`/relationship conventions, GraphQL mapper
 integration, joins/projection wrappers, legacy `wasChanged()`/audit hooks and
@@ -386,12 +377,11 @@ filter and relationship semantics are documented in light-entity's README.
 ### Persistence extension hook
 
 Model subclasses may override `protected function afterPersistence(bool $deleted): void`
-to run work after a successful write commits. Transactions queue hooks until the
-outer commit, after all participating Models have accepted their saved state.
-Hooks do not run for failed writes or rolled-back transactions. A hook exception
-propagates after the database commit; it does not roll back data. External writes
-made by a hook are not part of the original transaction. The protected
-`database()` accessor returns the
+to run work after a successful write commits. Deferred transactions invoke hooks only
+after all queued Models have accepted their committed state. Hooks do not run for
+failed writes or a cancelled new-Model insert. A hook exception propagates after the
+database commit; it does not roll back data. External writes made by a hook are not
+part of the original transaction. The protected `database()` accessor returns the
 Database bound to that Model, even if the application changes its default.
 
 `filters()` also accepts a list of condition maps, combined with AND, for example
