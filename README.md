@@ -85,6 +85,23 @@ String convenience operators escape literal wildcard characters; `like` accepts
 a pattern. Conditions and order fields are validated against mapped columns.
 `whereRaw()` takes trusted SQL and separate scalar provider-value parameters.
 
+Use `orderByRaw()` to sort by a trusted scalar SQL expression or correlated
+subquery. It accepts positional or named provider-value parameters and appends
+to existing ordering, just like `orderBy()`:
+
+```php
+$groups = IPGroup::Query()->orderByRaw(
+    '(SELECT name FROM DataCenter WHERE DataCenter.datacenter_id = IPGroup.datacenter_id)',
+    parameters: [],
+    descending: false,
+)->orderBy('id')->toArray();
+```
+
+Pass the expression without `ORDER BY` or `ASC`/`DESC`; `descending: true` selects
+DESC. Use SQL table/column names in the fragment and bind values separately.
+This API requires a light-entity version containing `DbSet::orderByRaw()` and
+`DbSet::thenByRaw()`.
+
 `count()`, `sum()`, `avg()`, `min()`, `max()` refer to the filtered set before
 pagination. `first()`, `any()`, iteration and `toArray()` respect pagination.
 Bulk writes execute immediately, bypass Model save/delete methods and leave

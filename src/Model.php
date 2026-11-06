@@ -27,7 +27,7 @@ abstract class Model extends Entity
     public function toArray(): array { return $this->jsonSerialize(); }
 
     /** @return Query<static> */
-    public static function Query(\Light\Linq\Expression\ValueExpression|array $where = []): Query
+    public static function Query(\Light\Linq\Expressions\ValueExpression|array $where = []): Query
     {
         $query = new Query(Database::getDefault(), static::class);
         return $where === [] ? $query : $query->where($where);

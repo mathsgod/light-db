@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6d52e30dbcf6e82338ff11003f22517b",
+    "content-hash": "dafb020bfd7282d56f2e54b89be6a316",
     "packages": [
         {
             "name": "graham-campbell/result-type",
@@ -107,21 +107,21 @@
         },
         {
             "name": "mathsgod/light-entity",
-            "version": "v1.0.0",
+            "version": "v1.2.0-RC1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/light-entity.git",
-                "reference": "16e1e1a73972ad975e117d10eca814a2b8ee58b0"
+                "reference": "208d5892a45d7ea46d5b9c7d9742076b075e5341"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/16e1e1a73972ad975e117d10eca814a2b8ee58b0",
-                "reference": "16e1e1a73972ad975e117d10eca814a2b8ee58b0",
+                "url": "https://api.github.com/repos/mathsgod/light-entity/zipball/208d5892a45d7ea46d5b9c7d9742076b075e5341",
+                "reference": "208d5892a45d7ea46d5b9c7d9742076b075e5341",
                 "shasum": ""
             },
             "require": {
                 "ext-pdo": "*",
-                "mathsgod/light-linq": "^1.0",
+                "mathsgod/light-linq": "^1.1",
                 "php": ">=8.3"
             },
             "require-dev": {
@@ -141,26 +141,27 @@
             "description": "A PDO-based entity ORM built on light-linq",
             "support": {
                 "issues": "https://github.com/mathsgod/light-entity/issues",
-                "source": "https://github.com/mathsgod/light-entity/tree/v1.0.0"
+                "source": "https://github.com/mathsgod/light-entity/tree/v1.2.0-RC1"
             },
-            "time": "2026-11-05T02:33:17+00:00"
+            "time": "2026-11-06T04:45:44+00:00"
         },
         {
             "name": "mathsgod/light-linq",
-            "version": "v1.0.0",
+            "version": "v1.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/light-linq.git",
-                "reference": "b687487d2e7e1d7f792f1255dabea97dfca7263f"
+                "reference": "f0083991b46fa6cda9560a5e9d91fe1314f7cc46"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/light-linq/zipball/b687487d2e7e1d7f792f1255dabea97dfca7263f",
-                "reference": "b687487d2e7e1d7f792f1255dabea97dfca7263f",
+                "url": "https://api.github.com/repos/mathsgod/light-linq/zipball/f0083991b46fa6cda9560a5e9d91fe1314f7cc46",
+                "reference": "f0083991b46fa6cda9560a5e9d91fe1314f7cc46",
                 "shasum": ""
             },
             "require": {
                 "mathsgod/light-collections": "^1.0",
+                "nikic/php-parser": "^5.0",
                 "php": ">=8.3"
             },
             "require-dev": {
@@ -179,9 +180,66 @@
             "description": "A provider-based LINQ-style query library for PHP",
             "support": {
                 "issues": "https://github.com/mathsgod/light-linq/issues",
-                "source": "https://github.com/mathsgod/light-linq/tree/v1.0.0"
+                "source": "https://github.com/mathsgod/light-linq/tree/v1.1.0"
             },
-            "time": "2026-11-03T08:33:39+00:00"
+            "time": "2026-11-06T04:24:38+00:00"
+        },
+        {
+            "name": "nikic/php-parser",
+            "version": "v5.9.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nikic/PHP-Parser.git",
+                "reference": "9e33da9553fe7786f0962b35f4e4ecf01be89def"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nikic/PHP-Parser/zipball/9e33da9553fe7786f0962b35f4e4ecf01be89def",
+                "reference": "9e33da9553fe7786f0962b35f4e4ecf01be89def",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-tokenizer": "*",
+                "php": ">=7.4"
+            },
+            "require-dev": {
+                "ircmaxell/php-yacc": "^0.0.7",
+                "phpunit/phpunit": "^9.0"
+            },
+            "bin": [
+                "bin/php-parse"
+            ],
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "5.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "PhpParser\\": "lib/PhpParser"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "authors": [
+                {
+                    "name": "Nikita Popov"
+                }
+            ],
+            "description": "A PHP parser written in PHP",
+            "keywords": [
+                "parser",
+                "php"
+            ],
+            "support": {
+                "issues": "https://github.com/nikic/PHP-Parser/issues",
+                "source": "https://github.com/nikic/PHP-Parser/tree/v5.9.0"
+            },
+            "time": "2026-09-13T18:51:52+00:00"
         },
         {
             "name": "phpoption/phpoption",
@@ -655,63 +713,6 @@
                 }
             ],
             "time": "2026-08-11T10:17:44+00:00"
-        },
-        {
-            "name": "nikic/php-parser",
-            "version": "v5.9.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/nikic/PHP-Parser.git",
-                "reference": "9e33da9553fe7786f0962b35f4e4ecf01be89def"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/nikic/PHP-Parser/zipball/9e33da9553fe7786f0962b35f4e4ecf01be89def",
-                "reference": "9e33da9553fe7786f0962b35f4e4ecf01be89def",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "ext-tokenizer": "*",
-                "php": ">=7.4"
-            },
-            "require-dev": {
-                "ircmaxell/php-yacc": "^0.0.7",
-                "phpunit/phpunit": "^9.0"
-            },
-            "bin": [
-                "bin/php-parse"
-            ],
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "5.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "PhpParser\\": "lib/PhpParser"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "BSD-3-Clause"
-            ],
-            "authors": [
-                {
-                    "name": "Nikita Popov"
-                }
-            ],
-            "description": "A PHP parser written in PHP",
-            "keywords": [
-                "parser",
-                "php"
-            ],
-            "support": {
-                "issues": "https://github.com/nikic/PHP-Parser/issues",
-                "source": "https://github.com/nikic/PHP-Parser/tree/v5.9.0"
-            },
-            "time": "2026-09-13T18:51:52+00:00"
         },
         {
             "name": "phar-io/manifest",
@@ -2380,7 +2381,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "mathsgod/light-entity": 5
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

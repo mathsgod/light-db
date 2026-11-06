@@ -7,7 +7,7 @@ namespace Light\Db;
 use Light\Entity\{DbSet, EntityMapping};
 use Light\Entity\Sql\{MySqlDialect, NotExpression, RawSqlPredicateExpression, SqliteDialect};
 use Light\Linq\{Enumerable, Expr, IEnumerable};
-use Light\Linq\Expression\ValueExpression;
+use Light\Linq\Expressions\ValueExpression;
 
 /** @template T of Model @implements \IteratorAggregate<int,T> */
 final class Query implements \IteratorAggregate, \Countable
@@ -101,6 +101,16 @@ final class Query implements \IteratorAggregate, \Countable
         return $copy;
     }
 
+    /** @return self<T> */
+    public function orderByRaw(string $sql, array $parameters = [], bool $descending = false): self
+    {
+        $copy = clone $this;
+        $copy->set = $this->ordered
+            ? $this->set->thenByRaw($sql, $parameters, $descending)
+            : $this->set->orderByRaw($sql, $parameters, $descending);
+        $copy->ordered = true;
+        return $copy;
+    }
     /** @return self<T> */
     public function order(string|array $order): self
     {
