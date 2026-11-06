@@ -55,8 +55,9 @@ abstract class Model extends Entity
         return $model;
     }
 
-    public function bind(array $attributes): static
+    public function bind(array|object $attributes): static
     {
+        if (is_object($attributes)) { $attributes = (array) $attributes; }
         $this->getMapping()->applyValues($this, $attributes);
         return $this;
     }

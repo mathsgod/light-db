@@ -79,10 +79,10 @@ custom constructors expecting Laminas primary-key/table/adapter arguments; use
 explicit factories or application methods. Hydration bypasses constructors.
 Dynamic attributes and public mutable typed properties are supported.
 
-Check subclass method signatures: `bind(array $attributes): static`,
-`save(): int` and `delete(): int`. An override accepting input objects can broaden
-`bind()`'s parameter but must keep a compatible return type. The base `bind()`
-accepts arrays of mapped model values and rejects unknown fields; it does not
+Check subclass method signatures: `bind(array|object $attributes): static`,
+`save(): int` and `delete(): int`. Overrides must keep compatible parameter and
+return types. The base `bind()` accepts arrays or objects of mapped model values,
+casts objects to arrays as in v1.x, and rejects unknown fields; it does not
 provide framework-specific GraphQL DTO/Undefined handling.
 
 `Get()` accepts a scalar key, a non-empty named condition map, or null. Composite
