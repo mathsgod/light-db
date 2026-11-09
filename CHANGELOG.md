@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.3.0 — 2026-11-09
 
 ### Added
 
@@ -11,6 +11,11 @@
   mapped-column filters.
 - Share operator translation between Query's mapped fields and expression
   filters, retaining existing metadata checks and value conversion.
+
+### Validation
+
+- SQLite and MySQL: 172 tests, 1,064 assertions each, no skips.
+- PHPStan level 5 passed.
 
 ## v2.2.1 — 2026-11-06
 

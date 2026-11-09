@@ -32,6 +32,14 @@ $user->save();
 $user->delete();
 ```
 
+## v2.3.0
+
+Adds `Filter::expression()` for applying structured filter operators to SQL
+functions and other scalar expressions. Query's mapped-column filters share the
+same operator builder while retaining metadata validation and value conversion.
+See [expression filtering](#filtering-sql-functions-and-other-expressions) and
+[the changelog](CHANGELOG.md).
+
 ## v2.2.1
 
 v2.2.0 inadvertently reintroduced deferred Model writes inside transactions.
