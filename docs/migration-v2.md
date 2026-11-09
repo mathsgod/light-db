@@ -176,6 +176,24 @@ Query. Order callbacks likewise return an expression or compatible Query.
 Named custom filters apply at the top level; nested logical groups use ordinary
 mapped-column conditions.
 
+For v1 `FilterHelper::processFilterValue()` calls that filtered a SQL function
+instead of a mapped column, use the expression filter API:
+
+```php
+use Light\Db\Filter;
+use Light\Entity\Sql\RawSqlValueExpression;
+
+Domain::RegisterFilter('status', static fn ($value) => Filter::expression(
+    new RawSqlValueExpression('Domain_Status(domain_id)'),
+    $value,
+));
+```
+
+This accepts the same scalar, IN-list and operator-map conditions as ordinary
+field filters. Raw SQL is developer-supplied and values remain bound parameters.
+Use provider values for raw function results; ordinary mapped-column filters
+retain their model converters. See [expression filtering](../README.md#filtering-sql-functions-and-other-expressions).
+
 `queryFilterDefinitions()` provides automatic named global filters. It is
 separate from explicitly selected `RegisterFilter()` search filters. Global
 filters affect reads, counts and bulk writes, but do not add authorization checks

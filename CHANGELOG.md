@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `Filter::expression(ValueExpression $expression, mixed $condition)` applies
+  existing filter operators to SQL functions or other scalar expressions, for
+  use in `where()` and custom filter callbacks. Expression parameters and filter
+  values remain bound; wildcard escaping and invalid-operand checks match
+  mapped-column filters.
+- Share operator translation between Query's mapped fields and expression
+  filters, retaining existing metadata checks and value conversion.
+
 ## v2.2.1 — 2026-11-06
 
 ### Fixed

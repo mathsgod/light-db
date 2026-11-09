@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Light\Db;
 
 use Light\Entity\{DbSet, EntityMapping};
-use Light\Entity\Sql\{LikeExpression, NotExpression};
+use Light\Entity\Sql\NotExpression;
+use Light\Db\Internal\FilterBuilder;
 use Light\Linq\{Enumerable, Expr, IEnumerable};
 use Light\Linq\Expressions\ValueExpression;
 
@@ -244,19 +245,13 @@ final class Query implements \IteratorAggregate, \Countable
         if (!in_array($name, $this->mapping->properties, true)) { throw new \InvalidArgumentException('Unknown column: '.$name); }
         return Expr::field($name);
     }
-    private function combine(array $parts, bool $and): ValueExpression
-    {
-        $result = array_shift($parts) ?? Expr::eq(Expr::value(1), $and ? 1 : 0);
-        foreach ($parts as $part) { $result = $and ? Expr::both($result,$part) : Expr::either($result,$part); }
-        return $result;
-    }
     private function expression(array $filter): ValueExpression
     {
         $parts = [];
         foreach ($filter as $name => $condition) {
             if (in_array($name, ['_and','_or'], true)) {
                 if (!is_array($condition) || !array_is_list($condition)) { throw new \InvalidArgumentException('Logical groups require a list of condition maps.'); }
-                $parts[] = $this->combine(array_map(fn (array $f) => $this->expression($f), $condition), $name === '_and');
+                $parts[] = FilterBuilder::combine(array_map(fn (array $f) => $this->expression($f), $condition), $name === '_and');
                 continue;
             }
             if ($name === '_not') {
@@ -264,37 +259,12 @@ final class Query implements \IteratorAggregate, \Countable
                 $parts[] = new NotExpression($this->expression($condition)); continue;
             }
             $field = $this->field((string)$name);
-            $conditions = is_array($condition) ? (array_is_list($condition) ? ['in'=>$condition] : $condition) : ['eq'=>$condition];
-            foreach ($conditions as $operator => $value) {
-                $operator = ltrim((string)$operator, '_');
-                $operator = $operator === 'ne' ? 'neq' : $operator;
-                if (in_array($operator,['eq','neq','gt','gte','lt','lte'], true)) {
-                    if ($value === null && !in_array($operator,['eq','neq'],true)) { throw new \InvalidArgumentException('Only equality accepts null.'); }
-                    $parts[] = Expr::$operator($field,$value);
-                } elseif (in_array($operator,['in','notIn'],true)) {
-                    if (!is_array($value) || !array_is_list($value)) { throw new \InvalidArgumentException('IN requires a value list.'); }
-                    $part = $this->combine(array_map(fn ($v) => Expr::eq($field,$v),$value), false);
-                    $parts[] = $operator === 'in' ? $part : new NotExpression($part);
-                } elseif (in_array($operator,['between','notBetween'],true)) {
-                    if (!is_array($value) || !array_is_list($value) || count($value)!==2) { throw new \InvalidArgumentException('Between requires two values.'); }
-                    $part = Expr::both(Expr::gte($field,$value[0]),Expr::lte($field,$value[1]));
-                    $parts[] = $operator === 'between' ? $part : new NotExpression($part);
-                } elseif (in_array($operator,['null','notNull'],true)) {
-                    if (!is_bool($value)) { throw new \InvalidArgumentException('Null tests require a boolean.'); }
-                    $parts[] = ($operator === 'null') === $value ? Expr::eq($field,null) : Expr::neq($field,null);
-                } elseif (in_array($operator,['like','contains','startsWith','endsWith'],true)) {
-                    if (!is_string($value)) { throw new \InvalidArgumentException('String filters require a string.'); }
-                    $pattern = $operator === 'like' ? $value : str_replace(['!','%','_'],['!!','!%','!_'],$value);
-                    if (in_array($operator,['contains','endsWith'],true)) { $pattern = '%'.$pattern; }
-                    if (in_array($operator,['contains','startsWith'],true)) { $pattern .= '%'; }
-                    $parts[] = new LikeExpression(
-                        $field,
-                        Expr::value($this->mapping->toProviderValue($name, $pattern)),
-                        '!',
-                    );
-                } else { throw new \InvalidArgumentException('Unknown filter operator: '.$operator); }
-            }
+            $parts[] = FilterBuilder::expression(
+                $field,
+                $condition,
+                fn (string $pattern) => $this->mapping->toProviderValue($name, $pattern),
+            );
         }
-        return $this->combine($parts,true);
+        return FilterBuilder::combine($parts,true);
     }
 }

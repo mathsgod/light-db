@@ -221,6 +221,45 @@ may override protected `filterDefinitions()` and `orderDefinitions()` instead.
 Custom named filters are applied at the top level; nested logical groups accept
 ordinary mapped-column conditions.
 
+### Filtering SQL functions and other expressions
+
+`Filter::expression()` applies the same scalar/list/operator-map conditions as
+mapped-column filters to any `ValueExpression`. It returns an expression usable
+by `where()`, `RegisterFilter()` or `filterDefinitions()`:
+
+```php
+use Light\Db\Filter;
+use Light\Entity\Sql\RawSqlValueExpression;
+
+Domain::RegisterFilter('status', static fn ($condition) => Filter::expression(
+    new RawSqlValueExpression('Domain_Status(domain_id)'),
+    $condition,
+));
+
+$domains = Domain::Query()->filters(['status' => ['in' => [0, 1]]]);
+
+$users = User::Query()->where(Filter::expression(
+    new RawSqlValueExpression('ABS(age) + :offset', ['offset' => 5]),
+    ['gte' => 20, 'lt' => 40],
+))->toArray();
+```
+
+Supported conditions include scalar equality, lists for IN, and the existing
+`eq`, `neq`/`ne`, comparison, range, null and string operators (including `_`
+prefixes). Multiple operators combine with AND. Empty IN matches nothing;
+empty NOT IN matches everything. Use `Expr::both()`, `Expr::either()` or
+`Expr::not()` to compose predicates; `_and`/`_or`/`_not` remain Query condition-map
+operators, not single-expression operators.
+
+The API accepts an expression object, not a SQL string. Raw SQL fragments must
+be application-owned; never let a request choose SQL text, identifiers or
+function names. Both raw-expression parameters and filter values are bound.
+Raw function results have no mapped-column converter, so supply provider values.
+Mapped-column `Query::filters()` keeps its existing metadata validation and
+value conversion, including converting escaped LIKE patterns exactly once.
+String convenience operators escape literal `%`, `_` and `!`; `like` accepts
+a pattern with `!` as the explicit escape character.
+
 ## Read-only queries
 
 ```php
